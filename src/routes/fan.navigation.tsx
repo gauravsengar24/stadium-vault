@@ -146,6 +146,7 @@ function FanNavigation() {
   const [session, setSession] = useState<FanSession | null>(null);
   const [selected, setSelected] = useState<string>("restroom");
   const [search, setSearch] = useState("");
+  const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const s = loadSession();
@@ -162,6 +163,24 @@ function FanNavigation() {
   const directions = useMemo(() => pathToDirections(path, active.label, userZone), [path, active.label, userZone]);
 
   const results = useMemo(() => searchAmenities(search), [search]);
+
+  const amenityDistances = useMemo(() => {
+    const d: Record<string, { distance: number; walkMinutes: number }> = {};
+    for (const a of AMENITIES) {
+      const p = bfsShortestPath(userZone, a.zone);
+      const dist = estimateDistance(p);
+      d[a.key] = { distance: dist, walkMinutes: Math.max(1, Math.round(dist / 80)) };
+    }
+    return d;
+  }, [userZone]);
+
+  function select(key: string) {
+    setSelected(key);
+    setSearch("");
+    setTimeout(() => {
+      mapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }
 
   return (
     <div className="space-y-6">
@@ -198,15 +217,16 @@ function FanNavigation() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.45fr]">
         <div className="space-y-2">
           {results.map((a) => {
             const isActive = a.key === selected;
             const isInZone = a.zone === userZone;
+            const ad = amenityDistances[a.key];
             return (
-              <button key={a.key} onClick={() => { setSelected(a.key); setSearch(""); }} className="w-full">
+              <button key={a.key} onClick={() => select(a.key)} className="group w-full">
                 <GlassCard
-                  className={`flex items-center gap-3 p-4 text-left transition ${
+                  className={`flex items-center gap-3 p-4 text-left transition hover:-translate-y-0.5 ${
                     isActive ? "border-safety-cyan/60 ring-1 ring-safety-cyan/30" : ""
                   }`}
                 >
@@ -223,11 +243,21 @@ function FanNavigation() {
                       )}
                     </div>
                     <p className="text-[11px] text-muted-foreground">{a.description}</p>
-                    <p className="mt-0.5 flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
+                    <p className="mt-0.5 flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
                       <MapPin className="size-3" /> {ZONE_LABELS[a.zone]} · Gate {a.zone}
+                      {ad && (
+                        <>
+                          <span className="text-muted-foreground/40">|</span>
+                          <span className="text-safety-cyan">{ad.distance}m</span>
+                          <span className="text-muted-foreground">· ~{ad.walkMinutes} min walk</span>
+                        </>
+                      )}
                     </p>
                   </div>
-                  <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Footprints className="size-4 text-muted-foreground/40 transition group-hover:text-safety-cyan" />
+                    <ArrowRight className={`size-4 transition ${isActive ? "text-safety-cyan translate-x-0.5" : "text-muted-foreground group-hover:translate-x-0.5 group-hover:text-safety-cyan"}`} />
+                  </div>
                 </GlassCard>
               </button>
             );
@@ -239,30 +269,32 @@ function FanNavigation() {
           )}
         </div>
 
-        <GlassCard className="overflow-hidden p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Route · via {path.length > 1 ? `${path.length - 1} zone${path.length > 2 ? "s" : ""}` : "same zone"}
-              </p>
-              <h3 className="mt-1 text-lg font-semibold">{active.label}</h3>
+        <div ref={mapRef}>
+          <GlassCard className="overflow-hidden p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  Route · via {path.length > 1 ? `${path.length - 1} zone${path.length > 2 ? "s" : ""}` : "same zone"}
+                </p>
+                <h3 className="mt-1 text-lg font-semibold">{active.label}</h3>
+              </div>
+              <span className="glass rounded-full px-3 py-1 text-xs font-mono">{distance}m</span>
             </div>
-            <span className="glass rounded-full px-3 py-1 text-xs font-mono">{distance}m</span>
-          </div>
 
-          <StadiumMap userZone={userZone} targetZone={targetZone} targetLabel={active.label} path={path} />
+            <StadiumMap userZone={userZone} targetZone={targetZone} targetLabel={active.label} path={path} />
 
-          <ol className="mt-5 space-y-2">
-            {directions.map((step, i) => (
-              <li key={i} className="glass flex items-start gap-3 rounded-2xl px-3 py-2.5">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-safety-cyan text-[10px] font-bold text-background">
-                  {i + 1}
-                </span>
-                <span className="text-sm text-muted-foreground">{step}</span>
-              </li>
-            ))}
-          </ol>
-        </GlassCard>
+            <ol className="mt-5 space-y-2">
+              {directions.map((step, i) => (
+                <li key={i} className="glass flex items-start gap-3 rounded-2xl px-3 py-2.5 transition hover:bg-glass-strong">
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-safety-cyan text-[10px] font-bold text-background">
+                    {i + 1}
+                  </span>
+                  <span className="text-sm text-muted-foreground">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </GlassCard>
+        </div>
       </div>
     </div>
   );

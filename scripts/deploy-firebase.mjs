@@ -4,10 +4,13 @@ import { createHash } from 'crypto'
 import { gzipSync } from 'zlib'
 import { JWT } from 'google-auth-library'
 
-const KEY_PATH = join(import.meta.dirname, '..', 'stadiumvault-007-service-account.json')
-const DIST = join(import.meta.dirname, '..', 'dist')
+const ROOT = import.meta.dirname ? join(import.meta.dirname, '..') : process.cwd()
+const KEY_PATH = join(ROOT, 'stadiumvault-007-service-account.json')
+const DIST = join(ROOT, 'dist')
 const PROJECT = 'stadiumvault-007'
 const SITE = 'stadiumvault-007'
+
+const FIREBASE_CONFIG = JSON.parse(readFileSync(join(ROOT, 'firebase.json'), 'utf-8'))
 
 const BASE = `projects/${PROJECT}/sites/${SITE}`
 const API = 'https://firebasehosting.googleapis.com/v1beta1'
@@ -67,9 +70,25 @@ async function deploy() {
     gzippedContents[hash] = gz
   }
 
-  // 1. Create version
+  // 1. Create version with hosting config from firebase.json
+  // Transform firebase.json format to API format:
+  //   source→glob, destination→path, and headers array→object of key:value
   console.log('[deploy] Creating version...')
-  const version = await api('POST', `${BASE}/versions`, JSON.stringify({}))
+  const config = { headers: [], rewrites: [] }
+
+  for (const h of FIREBASE_CONFIG.hosting.headers || []) {
+    const headerObj = { glob: h.source, headers: {} }
+    for (const kv of h.headers) {
+      headerObj.headers[kv.key] = kv.value
+    }
+    config.headers.push(headerObj)
+  }
+
+  for (const r of FIREBASE_CONFIG.hosting.rewrites || []) {
+    config.rewrites.push({ glob: r.source, path: r.destination })
+  }
+
+  const version = await api('POST', `${BASE}/versions`, JSON.stringify({ config }))
   const vname = version.name
   console.log(`[deploy] Version: ${vname}`)
 
