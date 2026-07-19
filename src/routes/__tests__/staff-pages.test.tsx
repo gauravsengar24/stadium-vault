@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { FC } from "react";
 
 vi.mock("@/stadium/shared/session", () => ({
   loadSession: vi.fn(() => ({
@@ -46,7 +47,7 @@ beforeEach(() => {
 describe("StaffDashboard", () => {
   it("renders dashboard with stat cards", async () => {
     const mod = await import("@/routes/staff.index");
-    const StaffDashboard = mod.Route.component;
+    const StaffDashboard = mod.Route.options.component as FC;
 
     render(<StaffDashboard />);
     expect(screen.getByText("Command center")).toBeInTheDocument();
@@ -61,7 +62,7 @@ describe("StaffDashboard", () => {
 describe("StaffBroadcast", () => {
   it("renders compose alert form", async () => {
     const mod = await import("@/routes/staff.broadcast");
-    const StaffBroadcast = mod.Route.component;
+    const StaffBroadcast = mod.Route.options.component as FC;
 
     render(<StaffBroadcast />);
     expect(screen.getByText("Emergency broadcast")).toBeInTheDocument();
@@ -73,7 +74,7 @@ describe("StaffBroadcast", () => {
 describe("StaffFire", () => {
   it("renders fire console with stats", async () => {
     const mod = await import("@/routes/staff.fire");
-    const StaffFire = mod.Route.component;
+    const StaffFire = mod.Route.options.component as FC;
 
     render(<StaffFire />);
     expect(screen.getByText("Fire safety console")).toBeInTheDocument();

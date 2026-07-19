@@ -4,9 +4,7 @@ import { Clock, MapPin, Loader2, CheckCircle2, ChefHat, Package } from "lucide-r
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { getCollection, addDocument } from "@/lib/firestore";
-import { onSnapshot, query, collection, where, orderBy, limit } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { getCollection, addDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/fan/food")({
@@ -40,6 +38,20 @@ interface Order {
 
 const FILTERS = ["all", "vegetarian", "vegan", "gluten-free", "halal", "kosher"];
 
+const FALLBACK_ITEMS: FoodItem[] = [
+  { id: "fi-1", name: "Classic Hot Dog", category: "Snacks", price: 7.50, vendor: "Titan Grill", zone: "N1", wait_minutes: 4, dietary: ["halal"], emoji: "🌭" },
+  { id: "fi-2", name: "Loaded Nachos", category: "Snacks", price: 9.00, vendor: "Nacho Republic", zone: "E2", wait_minutes: 6, dietary: ["vegetarian", "gluten-free"], emoji: "🧀" },
+  { id: "fi-3", name: "Veggie Burger", category: "Mains", price: 11.00, vendor: "Green Field", zone: "S1", wait_minutes: 8, dietary: ["vegetarian", "vegan"], emoji: "🍔" },
+  { id: "fi-4", name: "Chicken Wings", category: "Mains", price: 12.50, vendor: "Wing Zone", zone: "W1", wait_minutes: 10, dietary: ["halal", "gluten-free"], emoji: "🍗" },
+  { id: "fi-5", name: "Buttered Popcorn", category: "Snacks", price: 5.50, vendor: "Kernel Co.", zone: "N2", wait_minutes: 2, dietary: ["vegetarian", "gluten-free"], emoji: "🍿" },
+  { id: "fi-6", name: "Kosher Deli Sandwich", category: "Mains", price: 13.00, vendor: "Deli Kart", zone: "S2", wait_minutes: 7, dietary: ["kosher"], emoji: "🥪" },
+  { id: "fi-7", name: "Fresh Fruit Cup", category: "Healthy", price: 6.00, vendor: "Fresh Stand", zone: "E1", wait_minutes: 3, dietary: ["vegan", "gluten-free", "halal", "kosher"], emoji: "🍓" },
+  { id: "fi-8", name: "Craft Lemonade", category: "Drinks", price: 4.50, vendor: "Citrus Bar", zone: "W2", wait_minutes: 3, dietary: ["vegan", "gluten-free"], emoji: "🍋" },
+  { id: "fi-9", name: "Draft Beer", category: "Drinks", price: 9.00, vendor: "Stadium Taps", zone: "N1", wait_minutes: 4, dietary: ["vegan"], emoji: "🍺" },
+  { id: "fi-10", name: "Gluten-Free Pretzel", category: "Snacks", price: 6.50, vendor: "Twist & Salt", zone: "E2", wait_minutes: 5, dietary: ["vegetarian", "gluten-free"], emoji: "🥨" },
+  { id: "fi-11", name: "Bottled Water", category: "Drinks", price: 3.00, vendor: "Citrus Bar", zone: "W1", wait_minutes: 1, dietary: ["vegan", "gluten-free", "halal", "kosher"], emoji: "💧" },
+];
+
 const STATUS_TONE: Record<string, "amber" | "green" | "red"> = {
   pending: "amber",
   preparing: "amber",
@@ -51,6 +63,7 @@ const STATUS_TONE: Record<string, "amber" | "green" | "red"> = {
 function FanFood() {
   const [session, setSession] = useState<FanSession | null>(null);
   const [items, setItems] = useState<FoodItem[]>([]);
+  const [usingFallback, setUsingFallback] = useState(false);
   const [filter, setFilter] = useState("all");
   const [orders, setOrders] = useState<Order[]>([]);
   const [placing, setPlacing] = useState<string | null>(null);
@@ -61,30 +74,31 @@ function FanFood() {
   }, []);
 
   useEffect(() => {
-    getCollection<FoodItem>("food_items", { orderBy: ["wait_minutes", "asc"] })
-      .then(setItems);
+    Promise.race([
+      getCollection<FoodItem>("food_items", { orderBy: ["wait_minutes", "asc"] }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ]).then((data) => {
+      if (data && data.length > 0) setItems(data);
+      else { setItems(FALLBACK_ITEMS); setUsingFallback(true); }
+    }).catch(() => { setItems(FALLBACK_ITEMS); setUsingFallback(true); });
   }, []);
 
   useEffect(() => {
     if (!session) return;
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
-    const q = query(
-      collection(db, "food_orders"),
-      where("seat_no", "==", seatNo),
-      orderBy("created_at", "desc"),
-      limit(10),
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Order));
+    const prevRef: { current: Order[] } = { current: [] };
+    const unsub = listenCollection<Order>("food_orders", (data) => {
+      const prev = prevRef.current;
+      prevRef.current = data;
       setOrders(data);
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "modified") {
-          const next = change.doc.data() as { status: string; item_name: string };
-          if (next.status === "ready") toast.success(`${next.item_name} is ready to pick up!`);
-          if (next.status === "delivered") toast.success(`${next.item_name} delivered — enjoy!`);
+      for (const o of data) {
+        const prevO = prev.find((p) => p.id === o.id);
+        if (prevO && prevO.status !== o.status) {
+          if (o.status === "ready") toast.success(`${o.item_name} is ready to pick up!`);
+          if (o.status === "delivered") toast.success(`${o.item_name} delivered — enjoy!`);
         }
-      });
-    });
+      }
+    }, { where: ["seat_no", "==", seatNo], orderBy: ["created_at", "desc"], limit: 10 });
     return () => unsub();
   }, [session]);
 
@@ -125,6 +139,12 @@ function FanFood() {
   return (
     <div className="space-y-6">
       <SectionHeader eyebrow="Concession" title="Food & Drink" />
+
+      {usingFallback && (
+        <div className="rounded-2xl border border-safety-amber/30 bg-safety-amber/10 px-4 py-2 text-center text-[11px] font-medium text-safety-amber">
+          Menu data unavailable — showing sample items
+        </div>
+      )}
 
       {activeOrders.length > 0 && (
         <GlassCard className="p-5">

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import type { FC } from "react";
 
 vi.mock("@/stadium/shared/session", () => ({
   loadSession: vi.fn(() => null),
@@ -45,7 +46,7 @@ describe("FanDashboard", () => {
   it("shows explore mode when no session", async () => {
     vi.mocked(loadSession).mockReturnValue(null);
     const mod = await import("@/routes/fan.index");
-    const FanDashboard = mod.Route.component;
+    const FanDashboard = mod.Route.options.component as FC;
 
     render(<FanDashboard />);
     expect(screen.getByText("Explore mode")).toBeInTheDocument();
@@ -55,7 +56,7 @@ describe("FanDashboard", () => {
   it("shows quick actions", async () => {
     vi.mocked(loadSession).mockReturnValue(null);
     const mod = await import("@/routes/fan.index");
-    const FanDashboard = mod.Route.component;
+    const FanDashboard = mod.Route.options.component as FC;
 
     render(<FanDashboard />);
     expect(screen.getByText("Quick actions")).toBeInTheDocument();
@@ -68,7 +69,7 @@ describe("FanDashboard", () => {
 describe("FanAlerts", () => {
   it("shows all clear when no alerts", async () => {
     const mod = await import("@/routes/fan.alerts");
-    const FanAlerts = mod.Route.component;
+    const FanAlerts = mod.Route.options.component as FC;
 
     render(<FanAlerts />);
     expect(screen.getByText("All clear")).toBeInTheDocument();

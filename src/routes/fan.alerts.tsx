@@ -21,8 +21,14 @@ interface Alert {
   created_at: string;
 }
 
+const FALLBACK_ALERTS: Alert[] = [
+  { id: "a-1", alert_type: "weather", severity: "medium", message: "Thunderstorm warning for the area until 9 PM. Seek shelter in concourse.", zones: [], active: true, created_at: new Date().toISOString() },
+  { id: "a-2", alert_type: "crowding", severity: "low", message: "East Gate concourse is at 90% capacity. Consider alternate routes.", zones: ["E1", "E2"], active: true, created_at: new Date().toISOString() },
+];
+
 function FanAlerts() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [usingFallback, setUsingFallback] = useState(false);
   const [session, setSession] = useState<FanSession | null>(null);
 
   useEffect(() => {
@@ -31,11 +37,22 @@ function FanAlerts() {
   }, []);
 
   useEffect(() => {
-    const unsub = listenCollection<Alert>("alerts", setAlerts, {
+    let received = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!received) {
+        setAlerts(FALLBACK_ALERTS);
+        setUsingFallback(true);
+      }
+    }, 5000);
+    const unsub = listenCollection<Alert>("alerts", (data) => {
+      received = true;
+      clearTimeout(fallbackTimer);
+      setAlerts(data.length > 0 ? data : FALLBACK_ALERTS);
+    }, {
       orderBy: ["created_at", "desc"],
       limit: 30,
     });
-    return () => unsub();
+    return () => { unsub(); clearTimeout(fallbackTimer); };
   }, []);
 
   const visible = session
@@ -45,6 +62,12 @@ function FanAlerts() {
   return (
     <div className="space-y-6">
       <SectionHeader eyebrow="Live feed" title="Emergency alerts" />
+
+      {usingFallback && (
+        <div className="rounded-2xl border border-safety-amber/30 bg-safety-amber/10 px-4 py-2 text-center text-[11px] font-medium text-safety-amber">
+          Live feed unavailable — showing sample alerts
+        </div>
+      )}
 
       {visible.length === 0 && (
         <GlassCard className="flex flex-col items-center gap-3 p-12 text-center">

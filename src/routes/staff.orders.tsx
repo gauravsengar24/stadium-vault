@@ -4,9 +4,7 @@ import { CheckCircle2, ChefHat, Package, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { getCollection, updateDocument } from "@/lib/firestore";
-import { onSnapshot, query, collection, orderBy as fsOrderBy, limit as fsLimit } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { listenCollection, updateDocument } from "@/lib/firestore";
 import { loadSession, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/orders")({
@@ -54,22 +52,18 @@ function StaffOrders() {
   }, []);
 
   useEffect(() => {
-    async function load() {
-      const data = await getCollection<Order>("food_orders", { orderBy: ["created_at", "desc"], limit: 80 });
-      setOrders(data);
-    }
-    load();
-    const q = query(collection(db, "food_orders"), fsOrderBy("created_at", "desc"), fsLimit(80));
-    const unsub = onSnapshot(q, (snapshot) => {
-      load();
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const n = change.doc.data() as Order;
-          toast.info(`New order · ${n.item_name} · seat ${n.seat_no}`);
+    let prevCount = 0;
+    const unsub = listenCollection<Order>("food_orders", (data) => {
+      if (data.length > prevCount && prevCount > 0) {
+        const added = data.slice(0, data.length - prevCount).reverse();
+        for (const o of added) {
+          toast.info(`New order · ${o.item_name} · seat ${o.seat_no}`);
         }
-      });
-    });
-    return () => { unsub(); }
+      }
+      prevCount = data.length;
+      setOrders(data);
+    }, { orderBy: ["created_at", "desc"], limit: 80 });
+    return () => unsub();
   }, []);
 
   async function advance(o: Order) {

@@ -91,7 +91,6 @@ function pathToDirections(path: Zone[], targetLabel: string, fromZone: Zone): st
   if (path.length === 0) return ["No route available."];
   const steps: string[] = [];
   const dirLabel = (z: Zone) => {
-    const pos = ZONE_COORDS[z];
     return `${ZONE_LABELS[z] ?? z}`;
   };
   steps.push(`Start from your seat in ${dirLabel(fromZone)}.`);

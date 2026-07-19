@@ -4,7 +4,7 @@ import { LifeBuoy, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { getCollection, addDocument, listenCollection } from "@/lib/firestore";
+import { addDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/fan/help")({

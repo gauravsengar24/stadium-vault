@@ -63,7 +63,7 @@ function StaffDashboard() {
         crowdOccupancy: Math.round((totalNow / totalCap) * 100),
         pendingOrders,
       });
-      setRecent(recentIncidents as RecentIncident[]);
+      setRecent(recentIncidents as unknown as RecentIncident[]);
     }
     load();
     const unsub1 = listenCollection("incidents", load)

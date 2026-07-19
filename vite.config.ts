@@ -25,7 +25,7 @@ function inlineCssPlugin() {
           const cssPath = path.resolve(dist, href.replace(/^\//, ""));
           if (!fs.existsSync(cssPath)) return _;
           const css = fs.readFileSync(cssPath, "utf-8");
-          try { fs.unlinkSync(cssPath); } catch {}
+          fs.unlinkSync(cssPath);
           return `<style>${css}</style>`;
         },
       );

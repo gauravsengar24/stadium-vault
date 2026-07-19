@@ -12,7 +12,6 @@ import {
   deleteDoc,
   onSnapshot,
   getCountFromServer,
-  type Firestore,
   type DocumentData,
   type QueryConstraint,
   type WhereFilterOp,
@@ -20,7 +19,7 @@ import {
   type Unsubscribe,
   type SnapshotListenOptions,
 } from "firebase/firestore"
-import { db } from "@/integrations/firebase/client"
+import { db, ensureAuth } from "@/integrations/firebase/client"
 
 type WhereClause = [string, WhereFilterOp, unknown]
 type OrderClause = [string, OrderByDirection?]
@@ -62,6 +61,7 @@ export async function getCollection<T = Record<string, unknown>>(
   collectionName: string,
   opts: QueryOptions = {},
 ): Promise<T[]> {
+  await ensureAuth()
   const constraints = buildConstraints(opts)
   const q = query(collection(db, collectionName), ...constraints)
   const snapshot = await getDocs(q)
@@ -72,6 +72,7 @@ export async function getDocument<T = Record<string, unknown>>(
   collectionName: string,
   id: string,
 ): Promise<T | null> {
+  await ensureAuth()
   const d = doc(db, collectionName, id)
   const snapshot = await getDoc(d)
   if (!snapshot.exists()) return null
@@ -83,10 +84,14 @@ export async function getMaybeSingle<T = Record<string, unknown>>(
   field: string,
   value: unknown,
 ): Promise<T | null> {
+  await ensureAuth()
   const q = query(collection(db, collectionName), where(field, "==", value), limit(1))
-  const snapshot = await getDocs(q)
-  if (snapshot.empty) return null
-  const d = snapshot.docs[0]
+  const snapshot = await Promise.race([
+    getDocs(q),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+  ])
+  if (!snapshot || (snapshot as { empty: boolean }).empty) return null
+  const d = (snapshot as { docs: { id: string; data(): Record<string, unknown> }[] }).docs[0]
   return { id: d.id, ...d.data() } as unknown as T
 }
 
@@ -94,6 +99,7 @@ export async function addDocument<T extends Record<string, unknown>>(
   collectionName: string,
   data: T,
 ): Promise<string> {
+  await ensureAuth()
   const ref = await addDoc(collection(db, collectionName), data as DocumentData)
   return ref.id
 }
@@ -103,6 +109,7 @@ export async function updateDocument(
   id: string,
   data: Partial<Record<string, unknown>>,
 ): Promise<void> {
+  await ensureAuth()
   await updateDoc(doc(db, collectionName, id), data as DocumentData)
 }
 
@@ -110,6 +117,7 @@ export async function deleteDocument(
   collectionName: string,
   id: string,
 ): Promise<void> {
+  await ensureAuth()
   await deleteDoc(doc(db, collectionName, id))
 }
 
@@ -119,6 +127,7 @@ export async function getCount(
   op?: WhereFilterOp,
   value?: unknown,
 ): Promise<number> {
+  await ensureAuth()
   let constraints: QueryConstraint[] = []
   if (field && op && value !== undefined) {
     constraints = [where(field, op, value)]
@@ -137,17 +146,27 @@ export function listenCollection<T = Record<string, unknown>>(
   const constraints = buildConstraints(opts)
   const q = query(collection(db, collectionName), ...constraints)
 
-  return onSnapshot(
-    q,
-    { includeMetadataChanges: false } as SnapshotListenOptions,
-    (snapshot) => {
-      callback(snapshotToArray<T>(snapshot))
-    },
-    (error) => {
-      if (onError) onError(error)
+  let unsub: Unsubscribe | null = null
+  let cancelled = false
 
-    },
-  )
+  ensureAuth().then(() => {
+    if (cancelled) return
+    unsub = onSnapshot(
+      q,
+      { includeMetadataChanges: false } as SnapshotListenOptions,
+      (snapshot) => {
+        callback(snapshotToArray<T>(snapshot))
+      },
+      (error) => {
+        if (onError) onError(error)
+      },
+    )
+  })
+
+  return () => {
+    cancelled = true
+    if (unsub) unsub()
+  }
 }
 
 export function listenDocument<T = Record<string, unknown>>(
@@ -157,19 +176,30 @@ export function listenDocument<T = Record<string, unknown>>(
   onError?: (error: Error) => void,
 ): Unsubscribe {
   const d = doc(db, collectionName, docId)
-  return onSnapshot(
-    d,
-    { includeMetadataChanges: false } as SnapshotListenOptions,
-    (snapshot) => {
-      if (!snapshot.exists()) {
-        callback(null)
-        return
-      }
-      callback({ id: snapshot.id, ...snapshot.data() } as unknown as T)
-    },
-    (error) => {
-      if (onError) onError(error)
 
-    },
-  )
+  let unsub: Unsubscribe | null = null
+  let cancelled = false
+
+  ensureAuth().then(() => {
+    if (cancelled) return
+    unsub = onSnapshot(
+      d,
+      { includeMetadataChanges: false } as SnapshotListenOptions,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          callback(null)
+          return
+        }
+        callback({ id: snapshot.id, ...snapshot.data() } as unknown as T)
+      },
+      (error) => {
+        if (onError) onError(error)
+      },
+    )
+  })
+
+  return () => {
+    cancelled = true
+    if (unsub) unsub()
+  }
 }
