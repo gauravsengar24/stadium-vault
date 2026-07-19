@@ -46,24 +46,31 @@ function StaffDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [openIncidents, pendingHelp, activeAlerts, zoneRows, recentIncidents, pendingOrders] = await Promise.all([
-        getCollection("incidents", { where: ["status", "!=", "resolved"] }).then(items => items.length),
-        getCollection("help_queue", { where: ["status", "!=", "resolved"] }).then(items => items.length),
-        getCollection("alerts", { where: ["active", "==", true] }).then(items => items.length),
-        getCollection("crowd_zones") as Promise<{ current_count: number; capacity: number }[]>,
-        getCollection("incidents", { orderBy: ["created_at", "desc"], limit: 5 }),
-        getCollection<{ status: string }>("food_orders").then(all => all.filter(o => !["delivered","cancelled"].includes(o.status)).length),
-      ]);
-      const totalCap = zoneRows.reduce((a, z) => a + z.capacity, 0) || 1;
-      const totalNow = zoneRows.reduce((a, z) => a + z.current_count, 0);
-      setCounts({
-        openIncidents,
-        pendingHelp,
-        activeAlerts,
-        crowdOccupancy: Math.round((totalNow / totalCap) * 100),
-        pendingOrders,
-      });
-      setRecent(recentIncidents as unknown as RecentIncident[]);
+      try {
+        const result = await Promise.race([
+          Promise.all([
+            getCollection("incidents", { where: ["status", "!=", "resolved"] }).then(items => items.length),
+            getCollection("help_queue", { where: ["status", "!=", "resolved"] }).then(items => items.length),
+            getCollection("alerts", { where: ["active", "==", true] }).then(items => items.length),
+            getCollection("crowd_zones") as Promise<{ current_count: number; capacity: number }[]>,
+            getCollection("incidents", { orderBy: ["created_at", "desc"], limit: 5 }),
+            getCollection<{ status: string }>("food_orders").then(all => all.filter(o => !["delivered","cancelled"].includes(o.status)).length),
+          ]),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
+        if (!result) return;
+        const [openIncidents, pendingHelp, activeAlerts, zoneRows, recentIncidents, pendingOrders] = result;
+        const totalCap = zoneRows.reduce((a, z) => a + z.capacity, 0) || 1;
+        const totalNow = zoneRows.reduce((a, z) => a + z.current_count, 0);
+        setCounts({
+          openIncidents,
+          pendingHelp,
+          activeAlerts,
+          crowdOccupancy: Math.round((totalNow / totalCap) * 100),
+          pendingOrders,
+        });
+        setRecent(recentIncidents as unknown as RecentIncident[]);
+      } catch { /* Firestore unavailable — stay at zero counts */ }
     }
     load();
     const unsub1 = listenCollection("incidents", load)

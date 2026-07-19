@@ -62,8 +62,8 @@ const STATUS_TONE: Record<string, "amber" | "green" | "red"> = {
 
 function FanFood() {
   const [session, setSession] = useState<FanSession | null>(null);
-  const [items, setItems] = useState<FoodItem[]>([]);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [items, setItems] = useState<FoodItem[]>(FALLBACK_ITEMS);
+  const [usingFallback, setUsingFallback] = useState(true);
   const [filter, setFilter] = useState("all");
   const [orders, setOrders] = useState<Order[]>([]);
   const [placing, setPlacing] = useState<string | null>(null);
@@ -74,13 +74,17 @@ function FanFood() {
   }, []);
 
   useEffect(() => {
-    Promise.race([
-      getCollection<FoodItem>("food_items", { orderBy: ["wait_minutes", "asc"] }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-    ]).then((data) => {
-      if (data && data.length > 0) setItems(data);
-      else { setItems(FALLBACK_ITEMS); setUsingFallback(true); }
-    }).catch(() => { setItems(FALLBACK_ITEMS); setUsingFallback(true); });
+    let cancelled = false;
+    getCollection<FoodItem>("food_items", { orderBy: ["wait_minutes", "asc"] })
+      .then((data) => {
+        if (cancelled) return;
+        if (data && data.length > 0) {
+          setItems(data);
+          setUsingFallback(false);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {

@@ -67,11 +67,12 @@ describe("FanDashboard", () => {
 });
 
 describe("FanAlerts", () => {
-  it("shows all clear when no alerts", async () => {
+  it("shows sample alerts as fallback", async () => {
     const mod = await import("@/routes/fan.alerts");
     const FanAlerts = mod.Route.options.component as FC;
 
     render(<FanAlerts />);
-    expect(screen.getByText("All clear")).toBeInTheDocument();
+    expect(screen.getByText("Live feed unavailable — showing sample alerts")).toBeInTheDocument();
+    expect(screen.getByText("Thunderstorm warning for the area until 9 PM. Seek shelter in concourse.")).toBeInTheDocument();
   });
 });

@@ -27,8 +27,8 @@ const FALLBACK_ALERTS: Alert[] = [
 ];
 
 function FanAlerts() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [alerts, setAlerts] = useState<Alert[]>(FALLBACK_ALERTS);
+  const [usingFallback, setUsingFallback] = useState(true);
   const [session, setSession] = useState<FanSession | null>(null);
 
   useEffect(() => {
@@ -37,22 +37,16 @@ function FanAlerts() {
   }, []);
 
   useEffect(() => {
-    let received = false;
-    const fallbackTimer = setTimeout(() => {
-      if (!received) {
-        setAlerts(FALLBACK_ALERTS);
-        setUsingFallback(true);
-      }
-    }, 5000);
     const unsub = listenCollection<Alert>("alerts", (data) => {
-      received = true;
-      clearTimeout(fallbackTimer);
-      setAlerts(data.length > 0 ? data : FALLBACK_ALERTS);
+      if (data.length > 0) {
+        setAlerts(data);
+        setUsingFallback(false);
+      }
     }, {
       orderBy: ["created_at", "desc"],
       limit: 30,
     });
-    return () => { unsub(); clearTimeout(fallbackTimer); };
+    return () => unsub();
   }, []);
 
   const visible = session
