@@ -67,7 +67,8 @@ function FanChat() {
       setMessages([...next, { role: "assistant", content: res.reply }]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error(msg.includes("429") ? "Rate limited — try again shortly." : "Guardian AI is having trouble responding.");
+      console.error("Chat error:", e);
+      toast.error(msg.includes("429") ? "Rate limited — try again shortly." : `Guardian AI error: ${msg}`);
     } finally {
       setBusy(false);
     }
