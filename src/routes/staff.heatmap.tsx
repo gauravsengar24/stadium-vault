@@ -36,8 +36,18 @@ function StaffHeatmap() {
         load,
       )
       .subscribe();
-    // Simulate live density drift every 6s
+    // DEMO ONLY: simulate live density drift every 6s
+    // Only one tab runs the simulation to avoid conflicting writes
+    const SIM_KEY = "stadium-heatmap-sim-leader";
     const timer = setInterval(async () => {
+      const now = Date.now();
+      const leaderRaw = localStorage.getItem(SIM_KEY);
+      const leaderTs = leaderRaw ? parseInt(leaderRaw, 10) : 0;
+      // Relinquish leadership if we held it for >30s (handles tab close gracefully)
+      if (leaderRaw && now - leaderTs > 30_000) localStorage.removeItem(SIM_KEY);
+      // Only one tab claims leadership at a time
+      if (leaderRaw && now - leaderTs < 5_000) return;
+      localStorage.setItem(SIM_KEY, String(now));
       const { data } = await supabase.from("crowd_zones").select("*");
       const rows = (data ?? []) as Zone[];
       const target = rows[Math.floor(Math.random() * rows.length)];
@@ -56,6 +66,7 @@ function StaffHeatmap() {
     return () => {
       supabase.removeChannel(ch);
       clearInterval(timer);
+      localStorage.removeItem(SIM_KEY);
     };
   }, []);
 
