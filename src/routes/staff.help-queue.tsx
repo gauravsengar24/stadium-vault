@@ -53,7 +53,7 @@ function StaffHelpQueue() {
           { label: 'Active', value: counts.active, color: '#3b82f6' },
           { label: 'Resolved', value: counts.resolved, color: '#58d68d' },
         ].map(s => (
-          <div key={s.label} className="glass-card p-3 text-center">
+          <div key={s.label} className="glass p-3 text-center rounded-2xl">
             <div className="text-2xl font-bold text-white">{s.value}</div>
             <div className="text-xs text-[#6b7a99]">{s.label}</div>
           </div>
@@ -62,7 +62,7 @@ function StaffHelpQueue() {
 
       <div className="space-y-3 fade-in-up stagger-2">
         {requests.map(req => (
-          <div key={req.id} className={`glass-card p-4 ${
+          <div key={req.id} className={`glass p-4 rounded-2xl ${
             req.status === 'resolved' ? 'opacity-50' : ''
           }`}>
             <div className="flex items-start justify-between gap-3">

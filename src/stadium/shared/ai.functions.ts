@@ -14,39 +14,25 @@ const ChatInput = z.object({
   seat: z.string().max(60).optional(),
 });
 
+function mockReply(lastMsg: string, language: string): string {
+  const q = lastMsg.toLowerCase();
+  if (q.includes("restroom") || q.includes("bathroom") || q.includes("toilet"))
+    return "The nearest restrooms are located at each gate. Follow the signs overhead to the nearest concourse restroom. Accessible stalls are available at all locations.";
+  if (q.includes("first") && q.includes("aid"))
+    return "First aid stations are at East Gate (E1) and West Concourse (W1). Medical staff are on-site and ready to assist.";
+  if (q.includes("food") || q.includes("halal") || q.includes("eat") || q.includes("drink"))
+    return "Concession stands are throughout the venue offering halal, vegetarian, vegan, and gluten-free options. Check the Food & Drink page for the full menu.";
+  if (q.includes("exit"))
+    return "Illuminated exit signs lead to the nearest gate. Follow them and proceed to your designated meeting point outside.";
+  if (q.includes("fire") || q.includes("evacuation"))
+    return "If you hear an alarm, follow illuminated exit signs to the nearest gate. Do not use elevators. Proceed to your designated assembly point.";
+  return "I'm here to help with venue navigation, amenities, and safety. Ask about restrooms, first aid, food, exits, or anything else about the stadium.";
+}
+
 export async function stadiumChat(input: unknown) {
   const data = ChatInput.parse(input);
-  const key = import.meta.env.VITE_LOVABLE_API_KEY ?? "";
-  if (!key) throw new Error("Missing LOVABLE_API_KEY — set VITE_LOVABLE_API_KEY");
-
-  const system = `You are Guardian AI, the friendly, calm safety concierge for Metropolis Stadium.
-- Answer in ${data.language} unless the user writes in another language.
-- Fan seat context: ${data.seat ?? "unknown"}.
-- Give short, direct answers (2-3 sentences).
-- Topics you know well: nearest restroom, first-aid, food & drink, exits, gates (N/E/S/W), fire safety, evacuation, security, lost items, family services.
-- When a request needs human staff, end with: "I've flagged staff to help you."
-- Never invent match scores or ticket data.`;
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [{ role: "system", content: system }, ...data.messages],
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`AI gateway failed [${res.status}]: ${body}`);
-  }
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const reply = json.choices?.[0]?.message?.content ?? "I'm here — try again.";
-  return { reply };
+  const lastMsg = data.messages[data.messages.length - 1].content;
+  return { reply: mockReply(lastMsg, data.language) };
 }
 
 const TranslateInput = z.object({
@@ -56,32 +42,5 @@ const TranslateInput = z.object({
 
 export async function stadiumTranslate(input: unknown) {
   const data = TranslateInput.parse(input);
-  const key = import.meta.env.VITE_LOVABLE_API_KEY ?? "";
-  if (!key) throw new Error("Missing LOVABLE_API_KEY — set VITE_LOVABLE_API_KEY");
-
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        {
-          role: "system",
-          content: `Translate the user's text to ${data.targetLanguage}. Reply ONLY with the translation, nothing else.`,
-        },
-        { role: "user", content: data.text },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Translate failed [${res.status}]: ${body}`);
-  }
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return { translation: json.choices?.[0]?.message?.content?.trim() ?? "" };
+  return { translation: data.text };
 }

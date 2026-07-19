@@ -15,7 +15,7 @@ import {
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
 import { loadSession, ZONE_LABELS, type FanSession } from "@/stadium/shared/session";
-import { getCollection, listenCollection } from "@/lib/firestore";
+import { listenCollection } from "@/lib/firestore";
 
 export const Route = createFileRoute("/fan/")({
   component: FanDashboard,

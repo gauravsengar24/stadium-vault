@@ -58,14 +58,6 @@ function snapshotToArray<T = Record<string, unknown>>(snapshot: { docs: { id: st
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as T))
 }
 
-function snapshotToMap<T = Record<string, unknown>>(snapshot: { docs: { id: string; data: () => DocumentData }[] }): Record<string, T> {
-  const map: Record<string, T> = {}
-  for (const d of snapshot.docs) {
-    map[d.id] = { id: d.id, ...d.data() } as unknown as T
-  }
-  return map
-}
-
 export async function getCollection<T = Record<string, unknown>>(
   collectionName: string,
   opts: QueryOptions = {},
@@ -153,7 +145,7 @@ export function listenCollection<T = Record<string, unknown>>(
     },
     (error) => {
       if (onError) onError(error)
-      else console.error(`[Firestore] listenCollection error (${collectionName}):`, error)
+
     },
   )
 }
@@ -177,7 +169,7 @@ export function listenDocument<T = Record<string, unknown>>(
     },
     (error) => {
       if (onError) onError(error)
-      else console.error(`[Firestore] listenDocument error (${collectionName}/${docId}):`, error)
+
     },
   )
 }

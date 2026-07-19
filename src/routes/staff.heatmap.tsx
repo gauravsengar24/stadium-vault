@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { GlassCard, SectionHeader } from "@/stadium/shared/glass";
-import { getCollection, updateDocument, listenCollection } from "@/lib/firestore";
+import { listenCollection } from "@/lib/firestore";
 import { ZONE_LABELS } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/heatmap")({
@@ -23,28 +23,8 @@ function StaffHeatmap() {
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
-      const data = await getCollection<Zone>("crowd_zones", { orderBy: ["zone", "asc"] });
-      setZones(data);
-    }
-    load();
-    const unsub = listenCollection("crowd_zones", load);
-    const timer = setInterval(async () => {
-      const rows = await getCollection<Zone>("crowd_zones");
-      const target = rows[Math.floor(Math.random() * rows.length)];
-      if (!target) return;
-      const delta = Math.round((Math.random() - 0.5) * 80);
-      const nextCount = Math.max(0, Math.min(target.capacity, target.current_count + delta));
-      await updateDocument("crowd_zones", target.id, {
-        current_count: nextCount,
-        density: nextCount / target.capacity,
-        updated_at: new Date().toISOString(),
-      });
-    }, 6000);
-    return () => {
-      unsub();
-      clearInterval(timer);
-    };
+    const unsub = listenCollection<Zone>("crowd_zones", setZones, { orderBy: ["zone", "asc"] });
+    return () => { unsub(); };
   }, []);
 
   const focused = zones.find((z) => z.zone === selected) ?? zones[0];

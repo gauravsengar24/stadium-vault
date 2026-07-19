@@ -52,7 +52,7 @@ function StaffDashboard() {
         getCollection("alerts", { where: ["active", "==", true] }).then(items => items.length),
         getCollection("crowd_zones") as Promise<{ current_count: number; capacity: number }[]>,
         getCollection("incidents", { orderBy: ["created_at", "desc"], limit: 5 }),
-        getCollection("food_orders").then(all => all.filter((o: any) => !["delivered","cancelled"].includes(o.status)).length),
+        getCollection<{ status: string }>("food_orders").then(all => all.filter(o => !["delivered","cancelled"].includes(o.status)).length),
       ]);
       const totalCap = zoneRows.reduce((a, z) => a + z.capacity, 0) || 1;
       const totalNow = zoneRows.reduce((a, z) => a + z.current_count, 0);

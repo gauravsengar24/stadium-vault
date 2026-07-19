@@ -31,7 +31,7 @@ function StaffCrowd() {
           { icon: TrendingUp, label: 'Peak Zone', value: 'H (90%)', color: '#ef4444' },
           { icon: Thermometer, label: 'Flow Rate', value: '1.2k/hr', color: '#06b6d4' },
         ].map(s => (
-          <div key={s.label} className="glass-card p-3 text-center">
+          <div key={s.label} className="glass p-3 text-center rounded-2xl">
             <s.icon className="size-4 mx-auto mb-1" style={{ color: s.color }} />
             <div className="text-lg font-bold text-white">{s.value}</div>
             <div className="text-[10px] text-[#6b7a99]">{s.label}</div>
@@ -41,7 +41,7 @@ function StaffCrowd() {
 
       <div className="space-y-2 fade-in-up stagger-2">
         {zones.map(z => (
-          <div key={z.zone} className="glass-card-subtle p-3">
+          <div key={z.zone} className="glass p-3 rounded-2xl">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">Zone {z.zone}</span>

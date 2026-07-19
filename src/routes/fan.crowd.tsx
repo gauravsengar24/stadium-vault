@@ -38,7 +38,7 @@ function FanCrowd() {
           { icon: TrendingUp, label: 'Peak Today', value: '68%', color: '#f59e0b' },
           { icon: Thermometer, label: 'Comfort Index', value: 'Good', color: '#58d68d' },
         ].map(stat => (
-          <div key={stat.label} className="glass-card p-3 text-center">
+          <div key={stat.label} className="glass p-3 text-center rounded-2xl">
             <stat.icon className="size-4 mx-auto mb-1" style={{ color: stat.color }} />
             <div className="text-lg font-bold text-white">{stat.value}</div>
             <div className="text-[10px] text-[#6b7a99]">{stat.label}</div>
@@ -48,7 +48,7 @@ function FanCrowd() {
 
       <div className="space-y-2 fade-in-up stagger-2">
         {zoneData.map(zone => (
-          <div key={zone.zone} className="glass-card-subtle p-3">
+          <div key={zone.zone} className="glass p-3 rounded-2xl">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-white">Zone {zone.zone}</span>

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
 import { getCollection, addDocument } from "@/lib/firestore";
-import { onSnapshot, query, collection, where } from "firebase/firestore";
+import { onSnapshot, query, collection, where, orderBy, limit } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
@@ -68,20 +68,15 @@ function FanFood() {
   useEffect(() => {
     if (!session) return;
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
-    async function load() {
-      const data = await getCollection<Order>("food_orders", {
-        where: ["seat_no", "==", seatNo],
-        orderBy: ["created_at", "desc"],
-        limit: 10,
-      });
-      setOrders(data);
-    }
-    load();
     const q = query(
       collection(db, "food_orders"),
       where("seat_no", "==", seatNo),
+      orderBy("created_at", "desc"),
+      limit(10),
     );
     const unsub = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Order));
+      setOrders(data);
       snapshot.docChanges().forEach((change) => {
         if (change.type === "modified") {
           const next = change.doc.data() as { status: string; item_name: string };
@@ -89,7 +84,6 @@ function FanFood() {
           if (next.status === "delivered") toast.success(`${next.item_name} delivered — enjoy!`);
         }
       });
-      load();
     });
     return () => unsub();
   }, [session]);
