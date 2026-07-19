@@ -4,7 +4,7 @@ import { Radio, Power } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, SeverityPill, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, addDocument, updateDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/broadcast")({
@@ -43,25 +43,12 @@ function StaffBroadcast() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("alerts")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      setAlerts((data as Alert[]) ?? []);
+      const data = await getCollection<Alert>("alerts", { orderBy: ["created_at", "desc"], limit: 20 });
+      setAlerts(data);
     }
     load();
-    const ch = supabase
-      .channel("staff-broadcast")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "alerts" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub = listenCollection("alerts", load);
+    return () => { unsub(); }
   }, []);
 
   function toggleZone(z: string) {
@@ -74,19 +61,21 @@ function StaffBroadcast() {
     e.preventDefault();
     if (!session || !message.trim()) return;
     setSending(true);
-    const { error } = await supabase.from("alerts").insert({
-      alert_type: type,
-      severity: sev,
-      message: message.trim(),
-      zones: selectedZones,
-      active: true,
-      created_by: session.staffId,
-    });
-    setSending(false);
-    if (error) {
+    try {
+      await addDocument("alerts", {
+        alert_type: type,
+        severity: sev,
+        message: message.trim(),
+        zones: selectedZones,
+        active: true,
+        created_by: session.staffId,
+      });
+    } catch {
       toast.error("Broadcast failed.");
+      setSending(false);
       return;
     }
+    setSending(false);
     setMessage("");
     setSelectedZones([]);
     toast.success(
@@ -95,7 +84,7 @@ function StaffBroadcast() {
   }
 
   async function deactivate(id: string) {
-    await supabase.from("alerts").update({ active: false }).eq("id", id);
+    await updateDocument("alerts", id, { active: false });
     toast.success("Alert deactivated.");
   }
 

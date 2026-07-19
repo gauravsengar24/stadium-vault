@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { GlassCard, SectionHeader } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, updateDocument, listenCollection } from "@/lib/firestore";
 import { ZONE_LABELS } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/heatmap")({
@@ -24,49 +24,26 @@ function StaffHeatmap() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from("crowd_zones").select("*").order("zone");
-      setZones((data as Zone[]) ?? []);
+      const data = await getCollection<Zone>("crowd_zones", { orderBy: ["zone", "asc"] });
+      setZones(data);
     }
     load();
-    const ch = supabase
-      .channel("staff-heatmap")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "crowd_zones" },
-        load,
-      )
-      .subscribe();
-    // DEMO ONLY: simulate live density drift every 6s
-    // Only one tab runs the simulation to avoid conflicting writes
-    const SIM_KEY = "stadium-heatmap-sim-leader";
+    const unsub = listenCollection("crowd_zones", load);
     const timer = setInterval(async () => {
-      const now = Date.now();
-      const leaderRaw = localStorage.getItem(SIM_KEY);
-      const leaderTs = leaderRaw ? parseInt(leaderRaw, 10) : 0;
-      // Relinquish leadership if we held it for >30s (handles tab close gracefully)
-      if (leaderRaw && now - leaderTs > 30_000) localStorage.removeItem(SIM_KEY);
-      // Only one tab claims leadership at a time
-      if (leaderRaw && now - leaderTs < 5_000) return;
-      localStorage.setItem(SIM_KEY, String(now));
-      const { data } = await supabase.from("crowd_zones").select("*");
-      const rows = (data ?? []) as Zone[];
+      const rows = await getCollection<Zone>("crowd_zones");
       const target = rows[Math.floor(Math.random() * rows.length)];
       if (!target) return;
       const delta = Math.round((Math.random() - 0.5) * 80);
       const nextCount = Math.max(0, Math.min(target.capacity, target.current_count + delta));
-      await supabase
-        .from("crowd_zones")
-        .update({
-          current_count: nextCount,
-          density: nextCount / target.capacity,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("zone", target.zone);
+      await updateDocument("crowd_zones", target.id, {
+        current_count: nextCount,
+        density: nextCount / target.capacity,
+        updated_at: new Date().toISOString(),
+      });
     }, 6000);
     return () => {
-      supabase.removeChannel(ch);
+      unsub();
       clearInterval(timer);
-      localStorage.removeItem(SIM_KEY);
     };
   }, []);
 

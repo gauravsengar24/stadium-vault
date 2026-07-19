@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 
 import { GlassCard, GlassIcon, SectionHeader, SeverityPill } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { listenCollection } from "@/lib/firestore";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/fan/alerts")({
@@ -31,26 +31,11 @@ function FanAlerts() {
   }, []);
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("alerts")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(30);
-      setAlerts((data as Alert[]) ?? []);
-    }
-    load();
-    const ch = supabase
-      .channel("fan-alerts")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "alerts" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub = listenCollection<Alert>("alerts", setAlerts, {
+      orderBy: ["created_at", "desc"],
+      limit: 30,
+    });
+    return () => unsub();
   }, []);
 
   const visible = session

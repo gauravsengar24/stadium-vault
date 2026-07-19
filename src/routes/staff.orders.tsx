@@ -4,7 +4,9 @@ import { CheckCircle2, ChefHat, Package, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, updateDocument } from "@/lib/firestore";
+import { onSnapshot, query, collection, orderBy as fsOrderBy, limit as fsLimit } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
 import { loadSession, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/orders")({
@@ -53,47 +55,31 @@ function StaffOrders() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("food_orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(80);
-      setOrders((data as Order[]) ?? []);
+      const data = await getCollection<Order>("food_orders", { orderBy: ["created_at", "desc"], limit: 80 });
+      setOrders(data);
     }
     load();
-    const ch = supabase
-      .channel("staff-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "food_orders" },
-        (payload) => {
-          load();
-          if (payload.eventType === "INSERT") {
-            const n = payload.new as { item_name: string; seat_no: string };
-            toast.info(`New order · ${n.item_name} · seat ${n.seat_no}`);
-          }
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const q = query(collection(db, "food_orders"), fsOrderBy("created_at", "desc"), fsLimit(80));
+    const unsub = onSnapshot(q, (snapshot) => {
+      load();
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const n = change.doc.data() as Order;
+          toast.info(`New order · ${n.item_name} · seat ${n.seat_no}`);
+        }
+      });
+    });
+    return () => { unsub(); }
   }, []);
 
   async function advance(o: Order) {
     const step = NEXT[o.status];
     if (!step) return;
-    await supabase
-      .from("food_orders")
-      .update({ status: step.next, fulfilled_by: session?.staffId ?? o.fulfilled_by })
-      .eq("id", o.id);
+    await updateDocument("food_orders", o.id, { status: step.next, fulfilled_by: session?.staffId ?? o.fulfilled_by });
   }
 
   async function cancel(o: Order) {
-    await supabase
-      .from("food_orders")
-      .update({ status: "cancelled", fulfilled_by: session?.staffId ?? null })
-      .eq("id", o.id);
+    await updateDocument("food_orders", o.id, { status: "cancelled", fulfilled_by: session?.staffId ?? null });
   }
 
   const active = orders.filter((o) => o.status !== "delivered" && o.status !== "cancelled");

@@ -4,7 +4,7 @@ import { Flame, Siren, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { addDocument } from "@/lib/firestore";
 import { loadSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/fire")({
@@ -49,7 +49,7 @@ function StaffFire() {
     const s = loadSession();
     if (!s || s.role !== "staff") return;
     if (!evac[z]) {
-      await supabase.from("alerts").insert({
+      await addDocument("alerts", {
         alert_type: "evacuation",
         severity: "critical",
         message: `Immediate evacuation — Zone ${z}. Proceed to the nearest illuminated exit.`,
@@ -64,7 +64,7 @@ function StaffFire() {
   async function triggerAlarm() {
     const s = loadSession();
     if (!s || s.role !== "staff") return;
-    await supabase.from("alerts").insert({
+    await addDocument("alerts", {
       alert_type: "evacuation",
       severity: "critical",
       message:

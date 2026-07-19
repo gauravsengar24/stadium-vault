@@ -4,7 +4,7 @@ import { LifeBuoy, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, addDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/fan/help")({
@@ -36,27 +36,12 @@ function FanHelp() {
   useEffect(() => {
     if (!session) return;
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
-    async function load() {
-      const { data } = await supabase
-        .from("help_queue")
-        .select("*")
-        .eq("seat_no", seatNo)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      setTickets((data as Ticket[]) ?? []);
-    }
-    load();
-    const ch = supabase
-      .channel(`help-${seatNo}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "help_queue" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub = listenCollection<Ticket>("help_queue", setTickets, {
+      where: ["seat_no", "==", seatNo],
+      orderBy: ["created_at", "desc"],
+      limit: 10,
+    });
+    return () => unsub();
   }, [session]);
 
   async function submit(e: React.FormEvent) {
@@ -64,20 +49,20 @@ function FanHelp() {
     if (!session || !query.trim()) return;
     setSending(true);
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
-    const { error } = await supabase.from("help_queue").insert({
-      seat_no: seatNo,
-      zone: session.zone,
-      language: session.language,
-      query: query.trim(),
-      status: "pending",
-    });
-    setSending(false);
-    if (error) {
+    try {
+      await addDocument("help_queue", {
+        seat_no: seatNo,
+        zone: session.zone,
+        language: session.language,
+        query: query.trim(),
+        status: "pending",
+      });
+      setQuery("");
+      toast.success("Request sent — a staff member will respond shortly.");
+    } catch {
       toast.error("Couldn't send — try again.");
-      return;
     }
-    setQuery("");
-    toast.success("Request sent — a staff member will respond shortly.");
+    setSending(false);
   }
 
   return (

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, listenCollection } from "@/lib/firestore";
 import { ZONE_LABELS } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/")({
@@ -46,54 +46,32 @@ function StaffDashboard() {
 
   useEffect(() => {
     async function load() {
-      const [inc, help, al, zn, incidentList, ord] = await Promise.all([
-        supabase
-          .from("incidents")
-          .select("id", { count: "exact", head: true })
-          .neq("status", "resolved"),
-        supabase
-          .from("help_queue")
-          .select("id", { count: "exact", head: true })
-          .neq("status", "resolved"),
-        supabase
-          .from("alerts")
-          .select("id", { count: "exact", head: true })
-          .eq("active", true),
-        supabase.from("crowd_zones").select("current_count, capacity"),
-        supabase
-          .from("incidents")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("food_orders")
-          .select("id", { count: "exact", head: true })
-          .not("status", "in", "(delivered,cancelled)"),
+      const [openIncidents, pendingHelp, activeAlerts, zoneRows, recentIncidents, pendingOrders] = await Promise.all([
+        getCollection("incidents", { where: ["status", "!=", "resolved"] }).then(items => items.length),
+        getCollection("help_queue", { where: ["status", "!=", "resolved"] }).then(items => items.length),
+        getCollection("alerts", { where: ["active", "==", true] }).then(items => items.length),
+        getCollection("crowd_zones") as Promise<{ current_count: number; capacity: number }[]>,
+        getCollection("incidents", { orderBy: ["created_at", "desc"], limit: 5 }),
+        getCollection("food_orders").then(all => all.filter((o: any) => !["delivered","cancelled"].includes(o.status)).length),
       ]);
-      const zoneRows = (zn.data ?? []) as { current_count: number; capacity: number }[];
       const totalCap = zoneRows.reduce((a, z) => a + z.capacity, 0) || 1;
       const totalNow = zoneRows.reduce((a, z) => a + z.current_count, 0);
       setCounts({
-        openIncidents: inc.count ?? 0,
-        pendingHelp: help.count ?? 0,
-        activeAlerts: al.count ?? 0,
+        openIncidents,
+        pendingHelp,
+        activeAlerts,
         crowdOccupancy: Math.round((totalNow / totalCap) * 100),
-        pendingOrders: ord.count ?? 0,
+        pendingOrders,
       });
-      setRecent((incidentList.data as RecentIncident[]) ?? []);
+      setRecent(recentIncidents as RecentIncident[]);
     }
     load();
-    const ch = supabase
-      .channel("staff-dashboard")
-      .on("postgres_changes", { event: "*", schema: "public", table: "incidents" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "help_queue" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "alerts" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "crowd_zones" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "food_orders" }, load)
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub1 = listenCollection("incidents", load)
+    const unsub2 = listenCollection("help_queue", load)
+    const unsub3 = listenCollection("alerts", load)
+    const unsub4 = listenCollection("crowd_zones", load)
+    const unsub5 = listenCollection("food_orders", load)
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); }
   }, []);
 
   return (

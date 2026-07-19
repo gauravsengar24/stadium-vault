@@ -15,7 +15,7 @@ import {
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
 import { loadSession, ZONE_LABELS, type FanSession } from "@/stadium/shared/session";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, listenCollection } from "@/lib/firestore";
 
 export const Route = createFileRoute("/fan/")({
   component: FanDashboard,
@@ -49,42 +49,23 @@ function FanDashboard() {
   }, []);
 
   useEffect(() => {
-    async function load() {
-      const [aRes, zRes] = await Promise.all([
-        supabase
-          .from("alerts")
-          .select("*")
-          .eq("active", true)
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase.from("crowd_zones").select("*"),
-      ]);
+    const unsub1 = listenCollection<Alert>("alerts", (data) => {
       setAlerts(
         session
-          ? (aRes.data ?? []).filter(
-              (a: Alert) => a.zones.length === 0 || a.zones.includes(session.zone),
+          ? data.filter(
+              (a) => a.zones.length === 0 || a.zones.includes(session.zone),
             )
-          : (aRes.data ?? []),
+          : data,
       );
-      if (zRes.data) setAllZones(zRes.data as Zone[]);
-    }
-    load();
-
-    const channel = supabase
-      .channel("fan-dashboard")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "alerts" },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "crowd_zones" },
-        load,
-      )
-      .subscribe();
+    }, {
+      where: ["active", "==", true],
+      orderBy: ["created_at", "desc"],
+      limit: 5,
+    });
+    const unsub2 = listenCollection<Zone>("crowd_zones", setAllZones);
     return () => {
-      supabase.removeChannel(channel);
+      unsub1();
+      unsub2();
     };
   }, [session]);
 

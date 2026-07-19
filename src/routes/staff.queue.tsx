@@ -4,7 +4,7 @@ import { Send, UserCheck, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, updateDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/queue")({
@@ -36,47 +36,28 @@ function StaffQueue() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("help_queue")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      setTickets((data as Ticket[]) ?? []);
+      const data = await getCollection<Ticket>("help_queue", { orderBy: ["created_at", "desc"], limit: 50 });
+      setTickets(data);
     }
     load();
-    const ch = supabase
-      .channel("staff-queue")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "help_queue" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub = listenCollection("help_queue", load);
+    return () => { unsub(); }
   }, []);
 
   async function claim(id: string) {
     if (!session) return;
-    await supabase
-      .from("help_queue")
-      .update({ status: "assigned", assigned_to: session.staffId })
-      .eq("id", id);
+    await updateDocument("help_queue", id, { status: "assigned", assigned_to: session.staffId });
     toast.success("Ticket claimed.");
   }
 
   async function reply(id: string) {
     const text = replies[id]?.trim();
     if (!text || !session) return;
-    await supabase
-      .from("help_queue")
-      .update({
-        response: text,
-        status: "resolved",
-        assigned_to: session.staffId,
-      })
-      .eq("id", id);
+    await updateDocument("help_queue", id, {
+      response: text,
+      status: "resolved",
+      assigned_to: session.staffId,
+    });
     setReplies((r) => ({ ...r, [id]: "" }));
     toast.success("Replied and resolved.");
   }

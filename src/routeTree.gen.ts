@@ -19,8 +19,10 @@ import { Route as StaffSecurityRouteImport } from './routes/staff.security'
 import { Route as StaffQueueRouteImport } from './routes/staff.queue'
 import { Route as StaffOrdersRouteImport } from './routes/staff.orders'
 import { Route as StaffIncidentsRouteImport } from './routes/staff.incidents'
+import { Route as StaffHelpQueueRouteImport } from './routes/staff.help-queue'
 import { Route as StaffHeatmapRouteImport } from './routes/staff.heatmap'
 import { Route as StaffFireRouteImport } from './routes/staff.fire'
+import { Route as StaffCrowdRouteImport } from './routes/staff.crowd'
 import { Route as StaffBroadcastRouteImport } from './routes/staff.broadcast'
 import { Route as FanTicketRouteImport } from './routes/fan.ticket'
 import { Route as FanNavigationRouteImport } from './routes/fan.navigation'
@@ -28,6 +30,7 @@ import { Route as FanHelpRouteImport } from './routes/fan.help'
 import { Route as FanFoodRouteImport } from './routes/fan.food'
 import { Route as FanFireSafetyRouteImport } from './routes/fan.fire-safety'
 import { Route as FanEmergencyRouteImport } from './routes/fan.emergency'
+import { Route as FanCrowdRouteImport } from './routes/fan.crowd'
 import { Route as FanChatRouteImport } from './routes/fan.chat'
 import { Route as FanAlertsRouteImport } from './routes/fan.alerts'
 
@@ -81,6 +84,11 @@ const StaffIncidentsRoute = StaffIncidentsRouteImport.update({
   path: '/incidents',
   getParentRoute: () => StaffRoute,
 } as any)
+const StaffHelpQueueRoute = StaffHelpQueueRouteImport.update({
+  id: '/help-queue',
+  path: '/help-queue',
+  getParentRoute: () => StaffRoute,
+} as any)
 const StaffHeatmapRoute = StaffHeatmapRouteImport.update({
   id: '/heatmap',
   path: '/heatmap',
@@ -89,6 +97,11 @@ const StaffHeatmapRoute = StaffHeatmapRouteImport.update({
 const StaffFireRoute = StaffFireRouteImport.update({
   id: '/fire',
   path: '/fire',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffCrowdRoute = StaffCrowdRouteImport.update({
+  id: '/crowd',
+  path: '/crowd',
   getParentRoute: () => StaffRoute,
 } as any)
 const StaffBroadcastRoute = StaffBroadcastRouteImport.update({
@@ -126,6 +139,11 @@ const FanEmergencyRoute = FanEmergencyRouteImport.update({
   path: '/emergency',
   getParentRoute: () => FanRoute,
 } as any)
+const FanCrowdRoute = FanCrowdRouteImport.update({
+  id: '/crowd',
+  path: '/crowd',
+  getParentRoute: () => FanRoute,
+} as any)
 const FanChatRoute = FanChatRouteImport.update({
   id: '/chat',
   path: '/chat',
@@ -143,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRouteWithChildren
   '/fan/alerts': typeof FanAlertsRoute
   '/fan/chat': typeof FanChatRoute
+  '/fan/crowd': typeof FanCrowdRoute
   '/fan/emergency': typeof FanEmergencyRoute
   '/fan/fire-safety': typeof FanFireSafetyRoute
   '/fan/food': typeof FanFoodRoute
@@ -150,8 +169,10 @@ export interface FileRoutesByFullPath {
   '/fan/navigation': typeof FanNavigationRoute
   '/fan/ticket': typeof FanTicketRoute
   '/staff/broadcast': typeof StaffBroadcastRoute
+  '/staff/crowd': typeof StaffCrowdRoute
   '/staff/fire': typeof StaffFireRoute
   '/staff/heatmap': typeof StaffHeatmapRoute
+  '/staff/help-queue': typeof StaffHelpQueueRoute
   '/staff/incidents': typeof StaffIncidentsRoute
   '/staff/orders': typeof StaffOrdersRoute
   '/staff/queue': typeof StaffQueueRoute
@@ -164,6 +185,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/fan/alerts': typeof FanAlertsRoute
   '/fan/chat': typeof FanChatRoute
+  '/fan/crowd': typeof FanCrowdRoute
   '/fan/emergency': typeof FanEmergencyRoute
   '/fan/fire-safety': typeof FanFireSafetyRoute
   '/fan/food': typeof FanFoodRoute
@@ -171,8 +193,10 @@ export interface FileRoutesByTo {
   '/fan/navigation': typeof FanNavigationRoute
   '/fan/ticket': typeof FanTicketRoute
   '/staff/broadcast': typeof StaffBroadcastRoute
+  '/staff/crowd': typeof StaffCrowdRoute
   '/staff/fire': typeof StaffFireRoute
   '/staff/heatmap': typeof StaffHeatmapRoute
+  '/staff/help-queue': typeof StaffHelpQueueRoute
   '/staff/incidents': typeof StaffIncidentsRoute
   '/staff/orders': typeof StaffOrdersRoute
   '/staff/queue': typeof StaffQueueRoute
@@ -188,6 +212,7 @@ export interface FileRoutesById {
   '/staff': typeof StaffRouteWithChildren
   '/fan/alerts': typeof FanAlertsRoute
   '/fan/chat': typeof FanChatRoute
+  '/fan/crowd': typeof FanCrowdRoute
   '/fan/emergency': typeof FanEmergencyRoute
   '/fan/fire-safety': typeof FanFireSafetyRoute
   '/fan/food': typeof FanFoodRoute
@@ -195,8 +220,10 @@ export interface FileRoutesById {
   '/fan/navigation': typeof FanNavigationRoute
   '/fan/ticket': typeof FanTicketRoute
   '/staff/broadcast': typeof StaffBroadcastRoute
+  '/staff/crowd': typeof StaffCrowdRoute
   '/staff/fire': typeof StaffFireRoute
   '/staff/heatmap': typeof StaffHeatmapRoute
+  '/staff/help-queue': typeof StaffHelpQueueRoute
   '/staff/incidents': typeof StaffIncidentsRoute
   '/staff/orders': typeof StaffOrdersRoute
   '/staff/queue': typeof StaffQueueRoute
@@ -213,6 +240,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/fan/alerts'
     | '/fan/chat'
+    | '/fan/crowd'
     | '/fan/emergency'
     | '/fan/fire-safety'
     | '/fan/food'
@@ -220,8 +248,10 @@ export interface FileRouteTypes {
     | '/fan/navigation'
     | '/fan/ticket'
     | '/staff/broadcast'
+    | '/staff/crowd'
     | '/staff/fire'
     | '/staff/heatmap'
+    | '/staff/help-queue'
     | '/staff/incidents'
     | '/staff/orders'
     | '/staff/queue'
@@ -234,6 +264,7 @@ export interface FileRouteTypes {
     | '/'
     | '/fan/alerts'
     | '/fan/chat'
+    | '/fan/crowd'
     | '/fan/emergency'
     | '/fan/fire-safety'
     | '/fan/food'
@@ -241,8 +272,10 @@ export interface FileRouteTypes {
     | '/fan/navigation'
     | '/fan/ticket'
     | '/staff/broadcast'
+    | '/staff/crowd'
     | '/staff/fire'
     | '/staff/heatmap'
+    | '/staff/help-queue'
     | '/staff/incidents'
     | '/staff/orders'
     | '/staff/queue'
@@ -257,6 +290,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/fan/alerts'
     | '/fan/chat'
+    | '/fan/crowd'
     | '/fan/emergency'
     | '/fan/fire-safety'
     | '/fan/food'
@@ -264,8 +298,10 @@ export interface FileRouteTypes {
     | '/fan/navigation'
     | '/fan/ticket'
     | '/staff/broadcast'
+    | '/staff/crowd'
     | '/staff/fire'
     | '/staff/heatmap'
+    | '/staff/help-queue'
     | '/staff/incidents'
     | '/staff/orders'
     | '/staff/queue'
@@ -353,6 +389,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffIncidentsRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/staff/help-queue': {
+      id: '/staff/help-queue'
+      path: '/help-queue'
+      fullPath: '/staff/help-queue'
+      preLoaderRoute: typeof StaffHelpQueueRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/staff/heatmap': {
       id: '/staff/heatmap'
       path: '/heatmap'
@@ -365,6 +408,13 @@ declare module '@tanstack/react-router' {
       path: '/fire'
       fullPath: '/staff/fire'
       preLoaderRoute: typeof StaffFireRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/crowd': {
+      id: '/staff/crowd'
+      path: '/crowd'
+      fullPath: '/staff/crowd'
+      preLoaderRoute: typeof StaffCrowdRouteImport
       parentRoute: typeof StaffRoute
     }
     '/staff/broadcast': {
@@ -416,6 +466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FanEmergencyRouteImport
       parentRoute: typeof FanRoute
     }
+    '/fan/crowd': {
+      id: '/fan/crowd'
+      path: '/crowd'
+      fullPath: '/fan/crowd'
+      preLoaderRoute: typeof FanCrowdRouteImport
+      parentRoute: typeof FanRoute
+    }
     '/fan/chat': {
       id: '/fan/chat'
       path: '/chat'
@@ -436,6 +493,7 @@ declare module '@tanstack/react-router' {
 interface FanRouteChildren {
   FanAlertsRoute: typeof FanAlertsRoute
   FanChatRoute: typeof FanChatRoute
+  FanCrowdRoute: typeof FanCrowdRoute
   FanEmergencyRoute: typeof FanEmergencyRoute
   FanFireSafetyRoute: typeof FanFireSafetyRoute
   FanFoodRoute: typeof FanFoodRoute
@@ -448,6 +506,7 @@ interface FanRouteChildren {
 const FanRouteChildren: FanRouteChildren = {
   FanAlertsRoute: FanAlertsRoute,
   FanChatRoute: FanChatRoute,
+  FanCrowdRoute: FanCrowdRoute,
   FanEmergencyRoute: FanEmergencyRoute,
   FanFireSafetyRoute: FanFireSafetyRoute,
   FanFoodRoute: FanFoodRoute,
@@ -461,8 +520,10 @@ const FanRouteWithChildren = FanRoute._addFileChildren(FanRouteChildren)
 
 interface StaffRouteChildren {
   StaffBroadcastRoute: typeof StaffBroadcastRoute
+  StaffCrowdRoute: typeof StaffCrowdRoute
   StaffFireRoute: typeof StaffFireRoute
   StaffHeatmapRoute: typeof StaffHeatmapRoute
+  StaffHelpQueueRoute: typeof StaffHelpQueueRoute
   StaffIncidentsRoute: typeof StaffIncidentsRoute
   StaffOrdersRoute: typeof StaffOrdersRoute
   StaffQueueRoute: typeof StaffQueueRoute
@@ -473,8 +534,10 @@ interface StaffRouteChildren {
 
 const StaffRouteChildren: StaffRouteChildren = {
   StaffBroadcastRoute: StaffBroadcastRoute,
+  StaffCrowdRoute: StaffCrowdRoute,
   StaffFireRoute: StaffFireRoute,
   StaffHeatmapRoute: StaffHeatmapRoute,
+  StaffHelpQueueRoute: StaffHelpQueueRoute,
   StaffIncidentsRoute: StaffIncidentsRoute,
   StaffOrdersRoute: StaffOrdersRoute,
   StaffQueueRoute: StaffQueueRoute,

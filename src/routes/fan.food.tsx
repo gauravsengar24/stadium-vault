@@ -4,7 +4,9 @@ import { Clock, MapPin, Loader2, CheckCircle2, ChefHat, Package } from "lucide-r
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, addDocument } from "@/lib/firestore";
+import { onSnapshot, query, collection, where } from "firebase/firestore";
+import { db } from "@/integrations/firebase/client";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/fan/food")({
@@ -59,44 +61,37 @@ function FanFood() {
   }, []);
 
   useEffect(() => {
-    supabase
-      .from("food_items")
-      .select("*")
-      .order("wait_minutes")
-      .then(({ data }) => setItems((data as FoodItem[]) ?? []));
+    getCollection<FoodItem>("food_items", { orderBy: ["wait_minutes", "asc"] })
+      .then(setItems);
   }, []);
 
   useEffect(() => {
     if (!session) return;
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
     async function load() {
-      const { data } = await supabase
-        .from("food_orders")
-        .select("id, item_name, emoji, vendor, quantity, status, eta_minutes, fulfilled_by, created_at")
-        .eq("seat_no", seatNo)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      setOrders((data as Order[]) ?? []);
+      const data = await getCollection<Order>("food_orders", {
+        where: ["seat_no", "==", seatNo],
+        orderBy: ["created_at", "desc"],
+        limit: 10,
+      });
+      setOrders(data);
     }
     load();
-    const ch = supabase
-      .channel(`fan-orders-${seatNo}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "food_orders", filter: `seat_no=eq.${seatNo}` },
-        (payload) => {
-          load();
-          if (payload.eventType === "UPDATE") {
-            const next = payload.new as { status: string; item_name: string };
-            if (next.status === "ready") toast.success(`${next.item_name} is ready to pick up!`);
-            if (next.status === "delivered") toast.success(`${next.item_name} delivered — enjoy!`);
-          }
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const q = query(
+      collection(db, "food_orders"),
+      where("seat_no", "==", seatNo),
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "modified") {
+          const next = change.doc.data() as { status: string; item_name: string };
+          if (next.status === "ready") toast.success(`${next.item_name} is ready to pick up!`);
+          if (next.status === "delivered") toast.success(`${next.item_name} delivered — enjoy!`);
+        }
+      });
+      load();
+    });
+    return () => unsub();
   }, [session]);
 
   const filtered = useMemo(() => {
@@ -111,24 +106,24 @@ function FanFood() {
     }
     setPlacing(item.id);
     const seatNo = `${session.section}-${session.row}-${session.seat}`;
-    const { error } = await supabase.from("food_orders").insert({
-      seat_no: seatNo,
-      zone: session.zone,
-      vendor: item.vendor,
-      item_id: item.id,
-      item_name: item.name,
-      emoji: item.emoji,
-      price: item.price,
-      quantity: 1,
-      status: "pending",
-      eta_minutes: item.wait_minutes,
-    });
-    setPlacing(null);
-    if (error) {
+    try {
+      await addDocument("food_orders", {
+        seat_no: seatNo,
+        zone: session.zone,
+        vendor: item.vendor,
+        item_id: item.id,
+        item_name: item.name,
+        emoji: item.emoji,
+        price: item.price,
+        quantity: 1,
+        status: "pending",
+        eta_minutes: item.wait_minutes,
+      });
+      toast.success(`${item.name} sent to ${item.vendor}`);
+    } catch {
       toast.error("Order failed — try again.");
-      return;
     }
-    toast.success(`${item.name} sent to ${item.vendor}`);
+    setPlacing(null);
   }
 
   const activeOrders = orders.filter((o) => o.status !== "delivered" && o.status !== "cancelled");

@@ -4,7 +4,7 @@ import { ListChecks, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, SeverityPill, StatusDot } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
+import { getCollection, addDocument, updateDocument, listenCollection } from "@/lib/firestore";
 import { loadSession, ZONE_LABELS, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/incidents")({
@@ -46,50 +46,39 @@ function StaffIncidents() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("incidents")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(40);
-      setIncidents((data as Incident[]) ?? []);
+      const data = await getCollection<Incident>("incidents", { orderBy: ["created_at", "desc"], limit: 40 });
+      setIncidents(data);
     }
     load();
-    const ch = supabase
-      .channel("staff-incidents")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "incidents" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
+    const unsub = listenCollection("incidents", load);
+    return () => { unsub(); }
   }, []);
 
   async function log(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
     setSaving(true);
-    const { error } = await supabase.from("incidents").insert({
-      incident_type: type,
-      severity: sev,
-      zone,
-      description: desc || null,
-      reported_by: session.staffId,
-      status: "open",
-    });
-    setSaving(false);
-    if (error) {
+    try {
+      await addDocument("incidents", {
+        incident_type: type,
+        severity: sev,
+        zone,
+        description: desc || null,
+        reported_by: session.staffId,
+        status: "open",
+      });
+    } catch {
       toast.error("Failed to log — try again.");
+      setSaving(false);
       return;
     }
+    setSaving(false);
     setDesc("");
     toast.success("Incident logged");
   }
 
   async function resolve(id: string) {
-    await supabase.from("incidents").update({ status: "resolved" }).eq("id", id);
+    await updateDocument("incidents", id, { status: "resolved" });
     toast.success("Incident marked resolved.");
   }
 

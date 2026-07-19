@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader } from "@/stadium/shared/glass";
 import { loadSession, type FanSession } from "@/stadium/shared/session";
-import { supabase } from "@/integrations/supabase/client";
+import { addDocument } from "@/lib/firestore";
 
 export const Route = createFileRoute("/fan/emergency")({
   component: FanEmergency,
@@ -40,22 +40,22 @@ function FanEmergency() {
   async function trigger(kind: (typeof PANIC)[number]) {
     if (!session) return;
     setSending(kind.key);
-    const description = `${kind.label} — Section ${session.section} Row ${session.row} Seat ${session.seat}. ${note || "No additional details."}`;
-    const { error } = await supabase.from("incidents").insert({
-      incident_type: kind.key,
-      severity: kind.sev,
-      zone: session.zone,
-      description,
-      reported_by: `seat:${session.section}-${session.row}-${session.seat}`,
-      status: "open",
-    });
-    setSending(null);
-    if (error) {
+    try {
+      const description = `${kind.label} — Section ${session.section} Row ${session.row} Seat ${session.seat}. ${note || "No additional details."}`;
+      await addDocument("incidents", {
+        incident_type: kind.key,
+        severity: kind.sev,
+        zone: session.zone,
+        description,
+        reported_by: `seat:${session.section}-${session.row}-${session.seat}`,
+        status: "open",
+      });
+      setNote("");
+      toast.success(`${kind.label} team dispatched`);
+    } catch {
       toast.error("Couldn't reach the staff — please flag the nearest usher.");
-      return;
     }
-    setNote("");
-    toast.success(`${kind.label} team dispatched`);
+    setSending(null);
   }
 
   return (

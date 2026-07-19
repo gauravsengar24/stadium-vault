@@ -1,11 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Shield, UserX, Eye, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { GlassCard, GlassIcon, SectionHeader, SeverityPill } from "@/stadium/shared/glass";
-import { supabase } from "@/integrations/supabase/client";
-import { loadSession, type StaffSession } from "@/stadium/shared/session";
 
 export const Route = createFileRoute("/staff/security")({
   component: StaffSecurity,
@@ -14,66 +12,33 @@ export const Route = createFileRoute("/staff/security")({
 
 interface Entry {
   id: string;
-  incident_type: string;
-  description: string | null;
+  kind: "suspicious" | "ejection" | "watch";
+  note: string;
   zone: string;
+  when: string;
   severity: string;
-  status: string;
-  created_at: string;
 }
 
+const seed: Entry[] = [
+  { id: "1", kind: "suspicious", note: "Unattended backpack near turnstile 3", zone: "E1", when: "4m", severity: "high" },
+  { id: "2", kind: "ejection", note: "Party of two — repeat verbal warnings", zone: "S1", when: "18m", severity: "medium" },
+  { id: "3", kind: "watch", note: "Individual matches missing-child alert #A-118", zone: "N2", when: "22m", severity: "low" },
+];
+
 function StaffSecurity() {
-  const [session, setSession] = useState<StaffSession | null>(null);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [kind, setKind] = useState("suspicious");
+  const [entries, setEntries] = useState<Entry[]>(seed);
+  const [kind, setKind] = useState<Entry["kind"]>("suspicious");
   const [note, setNote] = useState("");
   const [zone, setZone] = useState("N1");
   const [sev, setSev] = useState("medium");
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const s = loadSession();
-    if (s?.role === "staff") {
-      setSession(s);
-      setZone(s.zone);
-    }
-  }, []);
-
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("incidents")
-        .select("*")
-        .in("incident_type", ["suspicious", "ejection", "watchlist", "security"])
-        .order("created_at", { ascending: false })
-        .limit(40);
-      setEntries((data as Entry[]) ?? []);
-    }
-    load();
-    const ch = supabase
-      .channel("staff-security")
-      .on("postgres_changes", { event: "*", schema: "public", table: "incidents" }, load)
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, []);
-
-  async function add(e: React.FormEvent) {
+  function add(e: React.FormEvent) {
     e.preventDefault();
-    if (!note.trim() || !session) return;
-    setSaving(true);
-    const { error } = await supabase.from("incidents").insert({
-      incident_type: kind,
-      severity: sev,
-      zone,
-      description: note.trim(),
-      reported_by: session.staffId,
-      status: "open",
-    });
-    setSaving(false);
-    if (error) {
-      toast.error("Failed to save — try again.");
-      return;
-    }
+    if (!note.trim()) return;
+    setEntries([
+      { id: String(Date.now()), kind, note: note.trim(), zone, when: "now", severity: sev },
+      ...entries,
+    ]);
     setNote("");
     toast.success("Security entry logged.");
   }
@@ -81,7 +46,7 @@ function StaffSecurity() {
   const kinds = [
     { key: "suspicious", label: "Suspicious", icon: Eye, tint: "amber" as const },
     { key: "ejection", label: "Ejection", icon: UserX, tint: "red" as const },
-    { key: "watchlist", label: "Watchlist", icon: Shield, tint: "violet" as const },
+    { key: "watch", label: "Watchlist", icon: Shield, tint: "violet" as const },
   ] as const;
 
   return (
@@ -98,7 +63,7 @@ function StaffSecurity() {
               {k.label}
             </p>
             <p className="mt-1 font-mono text-3xl font-semibold">
-              {entries.filter((e) => e.incident_type === k.key).length}
+              {entries.filter((e) => e.kind === k.key).length}
             </p>
           </GlassCard>
         ))}
@@ -109,7 +74,7 @@ function StaffSecurity() {
         <form onSubmit={add} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_2fr_auto]">
           <select
             value={kind}
-            onChange={(e) => setKind(e.target.value)}
+            onChange={(e) => setKind(e.target.value as Entry["kind"])}
             className="glass rounded-2xl px-3 py-2.5 text-sm"
           >
             {kinds.map((k) => (
@@ -149,35 +114,29 @@ function StaffSecurity() {
           />
           <button
             type="submit"
-            disabled={saving}
-            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-safety-amber px-4 text-xs font-semibold text-background disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-safety-amber px-4 text-xs font-semibold text-background"
           >
-            <Plus className="size-4" /> {saving ? "Saving…" : "Log"}
+            <Plus className="size-4" /> Log
           </button>
         </form>
       </GlassCard>
 
       <div className="space-y-2">
-        {entries.length === 0 && (
-          <p className="text-xs text-muted-foreground">No security entries yet.</p>
-        )}
         {entries.map((e) => (
           <GlassCard key={e.id} className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <SeverityPill severity={e.severity} />
                 <span className="text-xs font-semibold uppercase tracking-widest">
-                  {e.incident_type}
+                  {e.kind}
                 </span>
                 <span className="text-[11px] text-muted-foreground">
                   · Zone {e.zone}
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-muted-foreground">
-                {new Date(e.created_at).toLocaleTimeString()}
-              </span>
+              <span className="text-[10px] font-mono text-muted-foreground">{e.when}</span>
             </div>
-            {e.description && <p className="mt-2 text-sm">{e.description}</p>}
+            <p className="mt-2 text-sm">{e.note}</p>
           </GlassCard>
         ))}
       </div>

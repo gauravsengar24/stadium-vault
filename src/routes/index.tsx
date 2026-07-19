@@ -214,13 +214,14 @@ function StaffEntry() {
       return;
     }
     setLoading(true);
-    const { supabase } = await import("@/integrations/supabase/client");
-    const { data, error } = await supabase
-      .from("staff_directory")
-      .select("staff_id, name, role, zone")
-      .eq("staff_id", id)
-      .maybeSingle();
-    if (error || !data) {
+    const { getMaybeSingle } = await import("@/lib/firestore");
+    const data = await getMaybeSingle<{
+      staff_id: string;
+      name: string;
+      role: string;
+      zone: string;
+    }>("staff_directory", "staff_id", id);
+    if (!data) {
       toast.error("Staff ID not recognised. Try SEC-001, MED-001, or FIRE-001.");
       setLoading(false);
       return;

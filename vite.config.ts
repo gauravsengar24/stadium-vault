@@ -48,17 +48,12 @@ function inlineCssPlugin() {
 
 export default defineConfig({
   plugins: [
-    tanstackRouter({ autoCodeSplitting: true }),
+    tanstackRouter({ autoCodeSplitting: true, routeFileIgnorePattern: ".*__tests__.*" }),
     react(),
     tailwindcss(),
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     inlineCssPlugin(),
   ],
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/__tests__/setup.ts"],
-  },
   build: {
     target: "esnext",
     cssMinify: "lightningcss",
@@ -72,8 +67,8 @@ export default defineConfig({
           if (id.includes("node_modules/@tanstack/react-router")) {
             return "vendor-router";
           }
-          if (id.includes("node_modules/@supabase/supabase-js")) {
-            return "vendor-supabase";
+          if (id.includes("node_modules/firebase")) {
+            return "vendor-firebase";
           }
           if (id.includes("node_modules/lucide-react")) {
             return "vendor-lucide";
