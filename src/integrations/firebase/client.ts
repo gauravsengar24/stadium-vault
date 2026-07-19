@@ -32,13 +32,10 @@ let authReady: Promise<void> | null = null
 
 function ensureAuth() {
   if (!authReady) {
-    const withTimeout = Promise.race([
+    authReady = Promise.race([
       signInAnonymously(auth).then(() => {}),
       new Promise<void>((resolve) => setTimeout(resolve, 5000)),
-    ]);
-    authReady = withTimeout.catch((err) => {
-      console.warn("Anonymous auth failed:", err);
-    });
+    ]).catch(() => {})
   }
   return authReady
 }

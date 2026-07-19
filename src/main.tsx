@@ -14,7 +14,4 @@ function boot() {
   );
 }
 
-ensureAuth().then(boot).catch(() => {
-  console.warn("Firebase auth unavailable — continuing without authentication");
-  boot();
-});
+ensureAuth().then(boot).catch(boot);
