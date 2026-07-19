@@ -54,6 +54,11 @@ export default defineConfig({
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     inlineCssPlugin(),
   ],
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
+  },
   build: {
     target: "esnext",
     cssMinify: "lightningcss",
