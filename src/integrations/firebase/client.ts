@@ -2,7 +2,6 @@ import { initializeApp } from "firebase/app"
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore"
 import {
   getAuth,
-  signInAnonymously,
   connectAuthEmulator,
 } from "firebase/auth"
 
@@ -28,16 +27,8 @@ const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 const auth = getAuth(app)
 
-let authReady: Promise<void> | null = null
-
 function ensureAuth() {
-  if (!authReady) {
-    authReady = Promise.race([
-      signInAnonymously(auth).then(() => {}),
-      new Promise<void>((resolve) => setTimeout(resolve, 5000)),
-    ]).catch(() => {})
-  }
-  return authReady
+  return Promise.resolve()
 }
 
 if (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULATOR === "true") {

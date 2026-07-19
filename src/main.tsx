@@ -2,7 +2,6 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
-import { ensureAuth } from "@/integrations/firebase/client";
 import "./styles.css";
 
 function boot() {
@@ -14,4 +13,4 @@ function boot() {
   );
 }
 
-ensureAuth().then(boot).catch(boot);
+boot();
