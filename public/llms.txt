@@ -1,0 +1,23 @@
+# Stadium Guardian AI
+
+A real-time stadium safety and fan experience platform.
+
+## Fan Portal
+- https://stadiumvault-007.web.app/fan - AI concierge, navigation, food ordering, emergency alerts
+- https://stadiumvault-007.web.app/fan/alerts - Live safety broadcasts
+- https://stadiumvault-007.web.app/fan/chat - Multilingual AI assistant
+- https://stadiumvault-007.web.app/fan/navigation - Stadium directions
+- https://stadiumvault-007.web.app/fan/food - Food and drink ordering
+- https://stadiumvault-007.web.app/fan/emergency - One-tap medical, fire, security
+- https://stadiumvault-007.web.app/fan/ticket - Digital ticket lookup
+
+## Staff Console
+- https://stadiumvault-007.web.app/staff - Command center dashboard
+- https://stadiumvault-007.web.app/staff/incidents - Incident management
+- https://stadiumvault-007.web.app/staff/orders - Food order tracking
+- https://stadiumvault-007.web.app/staff/heatmap - Live crowd density heatmap
+- https://stadiumvault-007.web.app/staff/queue - Fan help queue
+- https://stadiumvault-007.web.app/staff/broadcast - Emergency broadcast system
+- https://stadiumvault-007.web.app/staff/fire - Fire safety controls
+- https://stadiumvault-007.web.app/staff/security - Security operations
+- https://stadiumvault-007.web.app/staff/translate - Real-time translation

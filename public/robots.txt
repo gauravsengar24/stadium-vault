@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://stadiumvault-007.web.app/sitemap.xml
