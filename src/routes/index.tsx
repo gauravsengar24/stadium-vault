@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ShieldCheck,
   Ticket,
@@ -8,6 +8,7 @@ import {
   Radio,
   Flame,
   Activity,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,8 +18,12 @@ import {
   seatToZone,
   ZONE_LABELS,
   LANGUAGES,
-  type StaffSession,
 } from "@/stadium/shared/session";
+import {
+  isValidStaffId,
+  resolveStaffIdentity,
+  toStaffSession,
+} from "@/stadium/shared/staff-directory";
 
 export const Route = createFileRoute("/")({
   component: PortalSelect,
@@ -28,7 +33,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Fans and staff sign in with a seat number or staff ID — no login, live safety in seconds.",
+          "Real-time stadium safety platform for fans and staff. AI concierge, live alerts, food ordering, incident management, and venue monitoring — no login required.",
       },
     ],
   }),
@@ -49,8 +54,8 @@ function PortalSelect() {
             Stadium Guardian <span className="text-safety-cyan">AI</span>
           </h1>
           <p className="max-w-xl text-pretty text-sm text-muted-foreground sm:text-base">
-            One control surface for fans and safety staff. Choose your role to
-            step inside the venue.
+            AI-powered venue intelligence for 80,000 seats. Real-time alerts,
+            food ordering, incident response, and crowd monitoring.
           </p>
         </div>
 
@@ -205,38 +210,69 @@ function StaffEntry() {
   const navigate = useNavigate();
   const [staffId, setStaffId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const attemptsRef = useRef(0);
+  const cooldownRef = useRef(false);
 
   async function handleEnter(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
+
     const id = staffId.trim().toUpperCase();
     if (!id) {
+      setError("Enter your staff ID.");
       toast.error("Enter your staff ID.");
+      inputRef.current?.focus();
       return;
     }
+
+    if (!isValidStaffId(id)) {
+      const msg = "Invalid format. Use e.g. SEC-001";
+      setError(msg);
+      toast.error(msg);
+      inputRef.current?.focus();
+      return;
+    }
+
+    if (cooldownRef.current) {
+      toast.error("Too many attempts. Wait a moment.");
+      return;
+    }
+
+    attemptsRef.current += 1;
+    if (attemptsRef.current > 5) {
+      cooldownRef.current = true;
+      toast.error("Too many attempts. Try again in 30 seconds.");
+      setTimeout(() => {
+        cooldownRef.current = false;
+        attemptsRef.current = 0;
+      }, 30000);
+      return;
+    }
+
     setLoading(true);
-    const { getMaybeSingle } = await import("@/lib/firestore");
-    const data = await getMaybeSingle<{
-      staff_id: string;
-      name: string;
-      role: string;
-      zone: string;
-    }>("staff_directory", "staff_id", id);
-    if (!data) {
-      toast.error("Staff ID not recognised. Try SEC-001, MED-001, or FIRE-001.");
+    try {
+      const { record, source } = await resolveStaffIdentity(id);
+      if (!record) {
+        const msg = "Staff ID not recognised. Try SEC-001, MED-001, or FIRE-001.";
+        setError(msg);
+        toast.error(msg);
+        setLoading(false);
+        inputRef.current?.focus();
+        return;
+      }
+
+      const session = toStaffSession(record);
+      saveSession(session);
+      attemptsRef.current = 0;
+      toast.success(`Welcome, ${record.name}${source === "fallback" ? " (offline mode)" : ""}`);
+      await navigate({ to: "/staff" });
+    } catch {
+      toast.error("Connection error. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-    const session: StaffSession = {
-      role: "staff",
-      staffId: data.staff_id,
-      name: data.name,
-      staffRole: data.role as StaffSession["staffRole"],
-      zone: data.zone,
-    };
-    saveSession(session);
-    toast.success(`Welcome, ${data.name}`);
-    await navigate({ to: "/staff" });
-    setLoading(false);
   }
 
   return (
@@ -252,17 +288,32 @@ function StaffEntry() {
           <ShieldCheck className="size-5" />
         </GlassIcon>
       </div>
-      <form onSubmit={handleEnter} className="space-y-4">
+      <form onSubmit={handleEnter} className="space-y-4" noValidate>
         <label className="block">
           <span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Staff ID
           </span>
           <input
+            ref={inputRef}
             value={staffId}
-            onChange={(e) => setStaffId(e.target.value)}
+            onChange={(e) => { setStaffId(e.target.value.slice(0, 10)); setError(""); }}
             placeholder="SEC-001"
-            className="glass w-full rounded-2xl px-3.5 py-2.5 text-lg font-semibold uppercase tracking-widest outline-none focus:border-safety-amber"
+            maxLength={10}
+            autoComplete="off"
+            aria-label="Staff ID"
+            aria-invalid={!!error}
+            aria-describedby={error ? "staff-id-error" : undefined}
+            className={`glass w-full rounded-2xl px-3.5 py-2.5 text-lg font-semibold uppercase tracking-widest outline-none transition ${
+              error
+                ? "border-safety-red/60 focus:border-safety-red"
+                : "focus:border-safety-amber"
+            }`}
           />
+          {error && (
+            <p id="staff-id-error" role="alert" className="mt-1.5 text-[11px] text-safety-red">
+              {error}
+            </p>
+          )}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Try{" "}
@@ -275,10 +326,19 @@ function StaffEntry() {
         <button
           type="submit"
           disabled={loading}
+          aria-busy={loading}
           className="group flex w-full items-center justify-center gap-2 rounded-2xl bg-safety-amber px-5 py-3 text-sm font-semibold text-background transition hover:brightness-110 disabled:opacity-50"
         >
-          Enter staff console
-          <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+          {loading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" /> Verifying…
+            </>
+          ) : (
+            <>
+              Enter staff console
+              <ArrowRight className="size-4 transition group-hover:translate-x-0.5" />
+            </>
+          )}
         </button>
       </form>
     </GlassCard>
