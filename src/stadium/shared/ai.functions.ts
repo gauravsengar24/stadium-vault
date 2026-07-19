@@ -33,84 +33,340 @@ function seatContext(seat?: string): string {
   return "";
 }
 
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+interface Intent {
+  name: string;
+  weight: number;
+  keywords: { term: string; score: number }[];
+  responses: ((query: string, ctx: string) => string)[];
+}
+
+const intents: Intent[] = [
+  {
+    name: "greeting",
+    weight: 1,
+    keywords: [
+      { term: "hi", score: 3 }, { term: "hello", score: 3 }, { term: "hey", score: 3 },
+      { term: "good morning", score: 5 }, { term: "good evening", score: 5 },
+      { term: "good afternoon", score: 5 }, { term: "howdy", score: 4 },
+      { term: "sup", score: 2 }, { term: "yo", score: 2 }, { term: "what's up", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Hey there! Welcome to Guardian AI.${ctx}\n\nI'm your stadium guide — ask me about directions, food, safety, or anything you need to make your visit better. What can I help with?`,
+      (q, ctx) => `Hi! Guardian AI here, ready to assist.${ctx}\n\nNeed help finding something? I can point you to restrooms, food, first aid, exits, or help with any situation. What's on your mind?`,
+      (q, ctx) => `Hello! I'm your AI concierge for today's event.${ctx}\n\nWhether you need directions, food recommendations, or safety info — just ask. How can I help you?`,
+    ],
+  },
+  {
+    name: "how_are_you",
+    weight: 1,
+    keywords: [
+      { term: "how are you", score: 5 }, { term: "how's it going", score: 5 },
+      { term: "how do you do", score: 4 }, { term: "you good", score: 3 },
+      { term: "what's good", score: 2 },
+    ],
+    responses: [
+      (q, ctx) => `Doing great, thanks for asking!${ctx}\n\nAll systems are running smoothly and I'm here to help. What do you need assistance with?`,
+      (q, ctx) => `I'm fully operational and ready to assist!${ctx}\n\nHow can I make your stadium experience better today?`,
+    ],
+  },
+  {
+    name: "thanks",
+    weight: 1,
+    keywords: [
+      { term: "thanks", score: 4 }, { term: "thank you", score: 5 },
+      { term: "thx", score: 3 }, { term: "ty", score: 2 }, { term: "appreciate it", score: 4 },
+      { term: "thank you so much", score: 5 }, { term: "cheers", score: 2 },
+    ],
+    responses: [
+      (q, ctx) => `You're very welcome!${ctx}\n\nGlad I could help. If you need anything else, just ask. Enjoy the event!`,
+      (q, ctx) => `Happy to help!${ctx}\n\nI'm always here if you need anything. Have a fantastic time at the stadium!`,
+    ],
+  },
+  {
+    name: "goodbye",
+    weight: 1,
+    keywords: [
+      { term: "bye", score: 4 }, { term: "goodbye", score: 5 }, { term: "see you", score: 4 },
+      { term: "cya", score: 2 }, { term: "farewell", score: 4 }, { term: "later", score: 2 },
+      { term: "see ya", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Take care and enjoy the rest of your time at the stadium!${ctx}\n\nIf you need anything, you know where to find me.`,
+      (q, ctx) => `Goodbye!${ctx}\n\nStay safe and have a great time. I'm always a message away if you need help!`,
+    ],
+  },
+  {
+    name: "restroom",
+    weight: 5,
+    keywords: [
+      { term: "restroom", score: 5 }, { term: "bathroom", score: 5 }, { term: "toilet", score: 5 },
+      { term: "washroom", score: 5 }, { term: "loo", score: 4 }, { term: "lavatory", score: 4 },
+      { term: "potty", score: 3 }, { term: "i need to pee", score: 5 },
+      { term: "i need to go", score: 3 }, { term: "where can i pee", score: 5 },
+      { term: "wc", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `You can find restrooms at every gate and concourse level throughout the stadium.${ctx}\n\nJust follow the blue wayfinding signs overhead — they clearly mark the nearest restrooms. All locations have accessible stalls and baby changing facilities available.`,
+      (q, ctx) => `Restrooms are conveniently located at all gates and concourse areas.${ctx}\n\nThe closest ones should be visible from the signage overhead — look for the blue restroom signs. Family restrooms with changing tables are also available at each location.`,
+      (q, ctx) => `Heading to the restroom? They're at every gate and concourse.${ctx}\n\nFollow the overhead signage to the nearest one. All are well-maintained and stocked throughout the event. Accessible stalls are available at every restroom location.`,
+    ],
+  },
+  {
+    name: "first_aid",
+    weight: 5,
+    keywords: [
+      { term: "first aid", score: 5 }, { term: "medic", score: 5 }, { term: "paramedic", score: 5 },
+      { term: "hurt", score: 4 }, { term: "injury", score: 5 }, { term: "bleeding", score: 5 },
+      { term: "unconscious", score: 5 }, { term: "heart attack", score: 5 },
+      { term: "medical", score: 4 }, { term: "doctor", score: 4 }, { term: "nurse", score: 4 },
+      { term: "ambulance", score: 5 }, { term: "sick", score: 3 },
+      { term: "feel dizzy", score: 4 }, { term: "fell down", score: 4 },
+      { term: "emergency", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `First Aid stations are staffed at East Gate (Zone E1) and West Concourse (Zone W1), with paramedics ready to assist.${ctx}\n\nIf you can't reach a station, flag down any staff member — they can radio for help and dispatch medical personnel to your location immediately. If it's urgent, don't wait — call out to the nearest staff member.`,
+      (q, ctx) => `Medical help is available right away.${ctx}\n\nThere are First Aid stations at East Gate (Zone E1) and West Concourse (Zone W1) with trained medical staff. For immediate assistance, any venue staff member can radio for a rapid medical response to your exact location.`,
+    ],
+  },
+  {
+    name: "food",
+    weight: 4,
+    keywords: [
+      { term: "food", score: 4 }, { term: "eat", score: 3 }, { term: "hungry", score: 4 },
+      { term: "concession", score: 5 }, { term: "restaurant", score: 3 },
+      { term: "snack", score: 3 }, { term: "lunch", score: 3 }, { term: "dinner", score: 3 },
+      { term: "drink", score: 3 }, { term: "coffee", score: 3 }, { term: "pizza", score: 3 },
+      { term: "hot dog", score: 3 }, { term: "burger", score: 3 }, { term: "taco", score: 3 },
+      { term: "menu", score: 3 }, { term: "order", score: 3 }, { term: "buy food", score: 4 },
+      { term: "something to eat", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `There are concession stands throughout the venue with plenty of options.${ctx}\n\nSouth Field (Zone S1) has the Main Concourse with the biggest selection — hot dogs, pizza, nachos, tacos, and more. East Concourse (Zone E2) has Stand B2. West Concourse (Zone W1) has Stand A1. You can browse the full menu and order from your seat on the Food & Drink page.`,
+      (q, ctx) => `Looking for food? You've got options!${ctx}\n\nThe Main Concession at South Field (Zone S1) has the widest variety. East Concourse (Zone E2) and West Concourse (Zone W1) also have stands. Check the Food & Drink page to browse menus, filter by diet, and order directly to your seat for pickup.`,
+    ],
+  },
+  {
+    name: "dietary",
+    weight: 5,
+    keywords: [
+      { term: "halal", score: 5 }, { term: "kosher", score: 5 }, { term: "vegan", score: 5 },
+      { term: "vegetarian", score: 4 }, { term: "gluten free", score: 5 },
+      { term: "gluten-free", score: 5 }, { term: "allergy", score: 4 },
+      { term: "allergen", score: 4 }, { term: "dietary", score: 4 }, { term: "diet", score: 3 },
+      { term: "lactose", score: 4 }, { term: "nut allergy", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `We've got you covered for dietary needs.${ctx}\n\nHalal options are at Stand B2 (East Concourse, Zone E2) and Main Concession (South Field, Zone S1). Vegetarian and vegan options are available at most stands — try the plant-based burger at Stand A1 (West Concourse, Zone W1). Gluten-free buns and wraps are available on request at any concession stand. Ask any vendor about specific ingredients.`,
+      (q, ctx) => `Dietary accommodations are available across the venue.${ctx}\n\nHalal and kosher options at Stand B2 (Zone E2). Most stands offer vegetarian and vegan choices. Gluten-free available on request at any location. If you have a specific allergy, ask the vendor directly — they have full ingredient lists.`,
+    ],
+  },
+  {
+    name: "exit",
+    weight: 4,
+    keywords: [
+      { term: "exit", score: 5 }, { term: "leave", score: 3 }, { term: "get out", score: 4 },
+      { term: "way out", score: 4 }, { term: "gate", score: 3 }, { term: "outside", score: 2 },
+      { term: "how do i get out", score: 5 }, { term: "evacuate", score: 5 },
+    ],
+    responses: [
+      (q, ctx) => `Follow the illuminated EXIT signs overhead — they lead to the nearest gate.${ctx}\n\nOnce outside, head to your designated meeting point. For reference: North gates lead to the main parking areas, South gates to public transit, and East/West gates to ride-share pickup zones.`,
+      (q, ctx) => `The nearest exit is clearly marked with illuminated overhead signage.${ctx}\n\nFollow the EXIT signs — they're designed to be visible even in low visibility conditions. If you're leaving for the day, remember your parking level or pickup location.`,
+    ],
+  },
+  {
+    name: "parking",
+    weight: 4,
+    keywords: [
+      { term: "parking", score: 5 }, { term: "park", score: 3 }, { term: "car", score: 3 },
+      { term: "garage", score: 4 }, { term: "parking lot", score: 5 },
+      { term: "parking structure", score: 5 }, { term: "where did i park", score: 5 },
+      { term: "find my car", score: 4 }, { term: "valet", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Parking Structure B is accessed through West Gate (Zone W2).${ctx}\n\nIt's a cashless facility — cards and mobile wallets only. Heads-up: take a photo of your parking level and row number before heading in — it makes finding your car afterward much easier.`,
+      (q, ctx) => `All parking is at Structure B via West Gate (Zone W2).${ctx}\n\nCashless entry and exit. If you took a ride-share, the designated pickup zone is at the South Gate (Zone S1).`,
+    ],
+  },
+  {
+    name: "seat",
+    weight: 4,
+    keywords: [
+      { term: "seat", score: 4 }, { term: "section", score: 4 }, { term: "row", score: 4 },
+      { term: "where am i sitting", score: 5 }, { term: "find my seat", score: 5 },
+      { term: "my seat", score: 4 }, { term: "where's my seat", score: 5 },
+      { term: "ticket", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Look for the section number banners hanging from the ceiling — they're large and easy to spot.${ctx}\n\nUshers at each section entrance can guide you to your specific row and seat number. If you entered your seat details at the entrance, you can view your ticket on the My Ticket page.`,
+      (q, ctx) => `Your section number is displayed on large overhead banners.${ctx}\n\nOnce you find your section, an usher will help you find your row and seat. If you need help locating your section on the map, use the Navigation page.`,
+    ],
+  },
+  {
+    name: "lost_child",
+    weight: 5,
+    keywords: [
+      { term: "lost child", score: 5 }, { term: "lost kid", score: 5 },
+      { term: "lost my child", score: 5 }, { term: "can't find my child", score: 5 },
+      { term: "can't find my kid", score: 5 }, { term: "missing child", score: 5 },
+      { term: "missing kid", score: 5 }, { term: "lost son", score: 5 },
+      { term: "lost daughter", score: 5 }, { term: "lost my baby", score: 5 },
+      { term: "i lost my", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `I'm flagging security to your zone right now.${ctx}\n\nPlease contact the nearest staff member immediately. Security has been alerted. Head to the Family Room at North Upper (Zone N2) — lost children are taken there for safety. Describe what they're wearing and where you last saw them. We'll find them quickly.`,
+      (q, ctx) => `Don't panic — we have procedures for this.${ctx}\n\nSecurity has been alerted to your location. Lost children are taken to the Family Room at North Upper (Zone N2). Please go there or speak to the nearest staff member. Tell us what they're wearing and any distinguishing features.`,
+    ],
+  },
+  {
+    name: "lost_item",
+    weight: 4,
+    keywords: [
+      { term: "lost my phone", score: 5 }, { term: "lost my wallet", score: 5 },
+      { term: "lost my bag", score: 5 }, { term: "lost my keys", score: 5 },
+      { term: "lost item", score: 4 }, { term: "lost and found", score: 5 },
+      { term: "lost something", score: 4 }, { term: "misplaced", score: 3 },
+      { term: "dropped my", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Check the Lost & Found at South Field (Zone S1).${ctx}\n\nAlso check with the nearest concession stand or gate attendant — items are often handed in there. If you remember where you were sitting, retrace your steps and check around your seat area first.`,
+      (q, ctx) => `Lost items are held at South Field (Zone S1) Lost & Found.${ctx}\n\nYou can also ask at any Guest Services desk or check with nearby staff. If it's a phone, try calling it — someone may have picked it up.`,
+    ],
+  },
+  {
+    name: "suspicious",
+    weight: 5,
+    keywords: [
+      { term: "suspicious", score: 5 }, { term: "unattended bag", score: 5 },
+      { term: "unattended package", score: 5 }, { term: "suspicious package", score: 5 },
+      { term: "suspicious bag", score: 5 }, { term: "threat", score: 4 },
+      { term: "danger", score: 3 }, { term: "weapon", score: 5 },
+      { term: "someone acting weird", score: 5 }, { term: "suspicious activity", score: 5 },
+      { term: "something doesn't look right", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `Security has been alerted to your zone.${ctx}\n\nDo NOT approach or confront anyone. Move to a safe distance and wait for security personnel to arrive. If you see an unattended bag or package, notify the nearest staff member right away — do not touch it. Your vigilance helps keep everyone safe.`,
+      (q, ctx) => `I'm notifying security immediately.${ctx}\n\nPlease move away from the area and do not engage. Security personnel are trained to handle these situations. Report what you saw to the responding officers. Thank you for looking out for everyone's safety.`,
+    ],
+  },
+  {
+    name: "help",
+    weight: 3,
+    keywords: [
+      { term: "help", score: 3 }, { term: "assistance", score: 4 },
+      { term: "wheelchair", score: 5 }, { term: "disabled", score: 4 },
+      { term: "accessibility", score: 5 }, { term: "special assistance", score: 5 },
+      { term: "service animal", score: 4 }, { term: "mobility", score: 4 },
+      { term: "crutches", score: 3 }, { term: "can't walk", score: 4 },
+    ],
+    responses: [
+      (q, ctx) => `Staff have been notified and someone will be with you shortly.${ctx}\n\nWheelchair access is available at all gates. If you need mobility assistance, ask any staff member for a wheelchair escort. Accessible restrooms are at every concourse level, and service animals are welcome throughout the venue.`,
+      (q, ctx) => `I'm connecting you with a venue team member.${ctx}\n\nAll gates are wheelchair accessible. If you need assistance getting to your seat or around the venue, Guest Services can provide a mobility escort. Just ask the nearest staff member or visit any Guest Services desk.`,
+    ],
+  },
+  {
+    name: "fire",
+    weight: 5,
+    keywords: [
+      { term: "fire", score: 5 }, { term: "smoke", score: 5 }, { term: "smelling smoke", score: 5 },
+      { term: "see smoke", score: 5 }, { term: "fire alarm", score: 5 },
+      { term: "evacuation", score: 5 }, { term: "evacuate", score: 5 },
+      { term: "alarm going off", score: 5 },
+    ],
+    responses: [
+      (q, ctx) => `Stay calm and act quickly.${ctx}\n\nIf you hear the alarm or see smoke: follow the illuminated EXIT signs to the nearest gate. DO NOT use elevators. If you see fire or smoke, alert the nearest staff member. Help those around you who may need assistance — especially elderly fans or those with disabilities. Proceed to your assembly point.`,
+      (q, ctx) => `Your safety is the priority.${ctx}\n\nLeave the area immediately using the nearest marked exit. Do not use elevators. If there's smoke, stay low where the air is clearer. Staff members are trained to guide you — follow their instructions. Once outside, move away from the building to your designated meeting point.`,
+    ],
+  },
+  {
+    name: "wifi",
+    weight: 3,
+    keywords: [
+      { term: "wifi", score: 5 }, { term: "wi-fi", score: 5 }, { term: "internet", score: 4 },
+      { term: "network", score: 4 }, { term: "signal", score: 3 }, { term: "online", score: 2 },
+      { term: "connect", score: 3 }, { term: "wireless", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Free Wi-Fi is available throughout the venue.${ctx}\n\nConnect to "Stadium-Free" — no password needed. For the best speeds, try areas away from crowded concession spots during peak times.`,
+      (q, ctx) => `Yes, we've got free Wi-Fi!${ctx}\n\nJust select "Stadium-Free" on your device — no password required. If the connection seems slow, try moving to a less crowded area.`,
+    ],
+  },
+  {
+    name: "water",
+    weight: 3,
+    keywords: [
+      { term: "water", score: 4 }, { term: "thirsty", score: 4 }, { term: "drinking fountain", score: 4 },
+      { term: "water station", score: 5 }, { term: "refill", score: 4 },
+      { term: "free water", score: 5 }, { term: "hydration", score: 3 },
+    ],
+    responses: [
+      (q, ctx) => `Free water refill stations are at every concourse restroom area.${ctx}\n\nYou'll also find dedicated water stations at North Upper (Zone N2) and South Upper (Zone S2). Bottled water is available at all concession stands for $4. Stay hydrated — especially on warm days!`,
+      (q, ctx) => `Stay hydrated! Free water refill stations are located near restrooms throughout the venue.${ctx}\n\nBottled water is also available at concession stands. Don't hesitate to ask any vendor for a cup of water — they're happy to help.`,
+    ],
+  },
+];
+
+function scoreIntent(intent: Intent, query: string): number {
+  let score = 0;
+  for (const kw of intent.keywords) {
+    if (query.includes(kw.term)) {
+      score += kw.score;
+    }
+  }
+  score *= intent.weight;
+  if (score > 0 && query.split(/\s+/).length <= 3) {
+    score *= 1.5;
+  }
+  return score;
+}
+
+function extractKeyInfo(query: string): string {
+  const tokens = query.split(/\s+/).filter(t => t.length > 2);
+  const stopWords = new Set([
+    "the", "this", "that", "with", "from", "have", "are", "was", "were",
+    "can", "you", "your", "for", "and", "not", "but", "its", "all", "any",
+    "how", "why", "what", "where", "who", "when", "which", "about", "just",
+    "like", "know", "need", "want", "tell", "give", "show", "help", "does",
+    "doing", "some", "there", "would", "could", "should", "been", "being",
+    "very", "too", "much", "more", "here", "over", "into", "than", "then",
+  ]);
+  return tokens.filter(t => !stopWords.has(t)).slice(0, 4).join(" ");
+}
+
+function fallback(query: string, ctx: string): string {
+  const keyInfo = extractKeyInfo(query);
+  const keyWords = keyInfo ? ` regarding "${keyInfo}"` : "";
+  return [
+    `I understand you're asking${keyWords ? keyWords.replace(/"/g, '') : " something"} but I'm not entirely sure what you're looking for.${ctx}\n\nCould you try rephrasing? Here are some things I can help with:\n• 🚻 Finding restrooms, exits, or parking\n• 🍔 Food options, menus, and dietary needs\n• 🏥 First aid, medical help, or emergencies\n• 🔒 Safety concerns or security issues\n• 📶 Wi-Fi, ATMs, or venue info\n\nWhat do you need?`,
+    `I want to make sure I help you correctly${keyWords}.${ctx}\n\nCould you be a bit more specific? Try asking something like:\n• "Where's the nearest restroom?"\n• "Show me halal food options"\n• "How do I get to first aid?"\n• "What do I do in an emergency?"`,
+    `I'm here to help but I want to give you the right information${keyWords}.${ctx}\n\nCan you tell me more about what you need? For example:\n• Directions to somewhere in the stadium\n• Information about food or amenities\n• Help with a safety or medical concern\n• General venue questions`,
+  ][Math.floor(Math.random() * 3)];
+}
+
 function mockReply(lastMsg: string, seat: string | undefined): string {
   const q = lastMsg.toLowerCase().trim();
   const ctx = seatContext(seat);
+  if (!q) return `I didn't catch that.${ctx}\n\nHow can I help you today?`;
 
-  // Greetings
-  if (q.match(/^(hi|hello|hey|yo|sup|good morning|good evening|good afternoon|howdy)/))
-    return `Hello! I'm Guardian AI, your stadium concierge.${ctx}\n\nHow can I help you today? You can ask me about directions, food, first aid, restrooms, exits, or any safety concern.`;
+  let bestIntent: Intent | null = null;
+  let bestScore = 0;
 
-  if (q.includes("how are you") || q.includes("how's it going"))
-    return `I'm fully operational and ready to help!${ctx}\n\nWhat do you need assistance with?`;
-
-  // Navigation / directions
-  if (q.match(/^(where|how (do|can) I|directions|navigate|find|locate|guide|take me|lead me|show me)/) ||
-      q.includes("way to") || q.includes("get to") || q.includes("walk to")) {
-    if (q.includes("restroom") || q.includes("bathroom") || q.includes("toilet") || q.includes("washroom"))
-      return `Restrooms are located at every gate and concourse level.${ctx}\n\nFrom your location, follow the blue wayfinding signs overhead — they'll guide you to the nearest restroom. All restrooms have accessible stalls and baby changing facilities.`;
-    if (q.includes("first") && q.includes("aid"))
-      return `First Aid stations are staffed at East Gate (Zone E1) and West Concourse (Zone W1).${ctx}\n\nBoth stations have paramedics on duty. If you can't make it to a station, flag any staff member and they'll radio for assistance immediately.`;
-    if (q.includes("food") || q.includes("eat") || q.includes("concession") || q.includes("drink") || q.includes("restaurant"))
-      return `There are concession stands throughout the venue.${ctx}\n\nSouth Field (Zone S1) has the Main Concourse with the widest selection — hot dogs, pizza, tacos, and vegan options. East Concourse (Zone E2) has Stand B2 with halal and gluten-free options. Check the Food & Drink page to browse menus and order to your seat.`;
-    if (q.includes("exit") || q.includes("leave") || q.includes("out") || q.includes("gate"))
-      return `Follow the illuminated EXIT signs overhead — they lead to the nearest gate.${ctx}\n\nOnce outside, proceed to your designated meeting point. In an evacuation, do NOT use elevators. If you're with children, hold hands and stay low if there's smoke.`;
-    if (q.includes("parking") || q.includes("car") || q.includes("park") || q.includes("garage") || q.includes("lot"))
-      return `Parking Structure B is accessed via West Gate (Zone W2).${ctx}\n\nHead toward the west side of the venue and follow the Parking signs. Cashless payment only — cards and mobile wallets accepted. Remember your parking level and row number.`;
-    if (q.includes("seat") || q.includes("section") || q.includes("row") || q.includes("ticket"))
-      return `Your seat info is on your ticket.${ctx}\n\nLook for the section number banners hanging from the ceiling. Ushers at every section entrance can guide you to your specific row and seat number.`;
-    return `I can help you find anything in the stadium.${ctx}\n\nTell me what you're looking for — restrooms, food, first aid, an exit, parking, or your seat — and I'll guide you there.`;
+  for (const intent of intents) {
+    const score = scoreIntent(intent, q);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIntent = intent;
+    }
   }
 
-  // Food & drink
-  if (q.includes("halal") || q.includes("kosher") || q.includes("vegan") || q.includes("vegetarian") || q.includes("gluten") || q.includes("allerg") || q.includes("dietary") || q.includes("diet"))
-    return `We have options for most dietary needs.${ctx}\n\nHalal: Available at Stand B2 (East Concourse) and Main Concession (South Field). Vegetarian/Vegan: Most stands offer plant-based options — try the Beyond Burger at Stand A1 (West Concourse). Gluten-free: Buns and wraps available on request. Ask any vendor about ingredients.\n\nCheck the Food & Drink page for the full menu with dietary filters.`;
-  if (q.includes("menu") || q.includes("order") || q.includes("buy") || q.includes("price") || q.includes("how much"))
-    return `You can browse the full menu and order from your seat on the Food & Drink page.${ctx}\n\nPopular items: Classic Hot Dog $8, Pizza Slice $6, Nachos $7, Bottled Water $4. Prices include tax. Orders are typically ready in 8-12 minutes — you'll get a notification when it's ready for pickup.`;
+  if (bestIntent && bestScore >= 4) {
+    return pick(bestIntent.responses)(q, ctx);
+  }
 
-  // Medical & emergencies
-  if ((q.includes("medical") || q.includes("hurt") || q.includes("injury") || q.includes("bleeding") || q.includes("unconscious") || q.includes("heart") || q.includes("attack") || q.includes("paramedic")) && !q.includes("first aid"))
-    return `I'm flagging medical staff to your location now.${ctx}\n\nA First Aid responder is being dispatched. If the situation is urgent, ask the nearest staff member to radio for immediate assistance. First Aid stations are at East Gate (Zone E1) and West Concourse (Zone W1).`;
-  if ((q.includes("fire") || q.includes("smoke") || q.includes("alarm") || q.includes("evacuat") || q.includes("emergency")) && !q.includes("first aid"))
-    return `If you hear the alarm: remain calm and follow the illuminated EXIT signs to the nearest gate.${ctx}\n\nDo NOT use elevators. If you see fire or smoke, alert the nearest staff member immediately. Help elderly or disabled fans around you if you can. Proceed to your assembly point outside.\n\nStaff have been alerted to your location. Follow their instructions.`;
-
-  // Safety & security
-  if (q.includes("lost") && (q.includes("child") || q.includes("kid") || q.includes("son") || q.includes("daughter") || q.includes("baby")))
-    return `I'm so sorry — let's find them quickly.${ctx}\n\nContact any staff member or go to the nearest Lost & Found (South Field, Zone S1). Security has been alerted. Describe what they're wearing and where you last saw them. Check the Family Room at North Upper (Zone N2) — lost children are taken there.`;
-  if (q.includes("lost") && (q.includes("phone") || q.includes("wallet") || q.includes("bag") || q.includes("keys")))
-    return `Lost items are held at the Lost & Found in South Field (Zone S1).${ctx}\n\nYou can also check with the nearest concession stand or gate attendant. If you remember your seat location, check there first — items are often turned in by nearby guests.`;
-  if (q.includes("suspicious") || q.includes("unattended") || q.includes("threat") || q.includes("danger") || q.includes("weapon"))
-    return `I'm alerting security to your zone immediately.${ctx}\n\nDo not approach or confront. Move to a safe distance and wait for security personnel. If you see an unattended bag or package, notify the nearest staff member right away. Your safety is our priority.`;
-
-  // Staff / help
-  if (q.includes("help") || q.includes("assistance") || q.includes("wheelchair") || q.includes("disabled") || q.includes("accessibility") || q.includes("special") || q.includes("accommodation"))
-    return `I've flagged a staff member to assist you.${ctx}\n\nWheelchair access is available at all gates. If you need mobility assistance, ask any staff member for a wheelchair escort. Accessible restrooms are at every concourse level. Service animals are welcome.`;
-  if (q.includes("staff") || q.includes("manager") || q.includes("supervisor") || q.includes("complain") || q.includes("speak"))
-    return `I'll connect you with a venue supervisor.${ctx}\n\nIn the meantime, you can also visit the Guest Services desk at any gate entrance or go to the Main Office at South Field (Zone S1).`;
-
-  // Venue info
-  if (q.includes("wifi") || q.includes("internet") || q.includes("network") || q.includes("signal"))
-    return `Free Wi-Fi is available throughout the venue.${ctx}\n\nConnect to the "Stadium-Free" network — no password required. For the best signal, avoid the most congested areas near concession stands during peak times.`;
-  if (q.includes("atm") || q.includes("cash") || q.includes("money") || q.includes("payment") || q.includes("card") || q.includes("wallet"))
-    return `The venue is cashless — all payments by card or mobile wallet.${ctx}\n\nATMs are located at West Gate (Zone W2) and near South Field (Zone S1). You can also add funds to your digital wallet at any Guest Services desk.`;
-  if (q.includes("first") && q.includes("half") || q.includes("second") || q.includes("half") || q.includes("schedule") || q.includes("time") || q.includes("when") || q.includes("start") || q.includes("kickoff") || q.includes("match"))
-    return `You can check the event schedule on the scoreboard and on the stadium app.${ctx}\n\nFor live match updates, keep an eye on the main screen — it shows the clock, score, and key plays. I don't have live match data, so check the official app for real-time updates.`;
-
-  // Help for specific situations
-  if (q.includes("cold") || q.includes("blanket") || q.includes("jacket"))
-    return `It can get cool in the concourse areas.${ctx}\n\nCheck with Guest Services at any gate — they may have emergency blankets available. You can also visit the Merchandise stands (East Concourse, Zone E2) for team jackets and hoodies.`;
-  if (q.includes("water") || q.includes("drink") || q.includes("thirsty") && !q.includes("alcohol") && !q.includes("beer"))
-    return `Free water refill stations are located at every concourse restroom area and at North Upper (Zone N2) and South Upper (Zone S2).${ctx}\n\nBottled water is also available at all concession stands for $4. Stay hydrated!`;
-  if (q.includes("baby") || q.includes("diaper") || q.includes("nurs") || q.includes("breastfeed"))
-    return `The Family Room at North Upper (Zone N2) is available for parents with infants.${ctx}\n\nIt has changing tables, private nursing areas, and a quiet space. Accessible restrooms also have changing stations.`;
-
-  // Thanks / closure
-  if (q.match(/^(thanks|thank you|thx|ty|appreciate)/))
-    return `You're welcome!${ctx}\n\nI'm always here if you need help. Stay safe and enjoy the event! 🏟️`;
-  if (q.match(/^(bye|goodbye|see you|cya|farewell)/))
-    return `Take care!${ctx}\n\nIf you need anything else, just ask. Have a great time at the stadium!`;
-
-  return `I'm Guardian AI, your stadium concierge. I can help with directions, food, first aid, safety, and anything else during your visit.${ctx}\n\nTry asking me: "Where's the nearest restroom?", "Show me halal food options", "How do I get to first aid?", or "What do I do in an emergency?"`;
+  return fallback(q, ctx);
 }
 
 export async function stadiumChat(input: unknown) {
@@ -124,12 +380,42 @@ const TranslateInput = z.object({
   targetLanguage: z.string().min(2).max(20),
 });
 
+const knownTranslations: Record<string, Record<string, string>> = {
+  es: {
+    "hello": "Hola", "thank you": "Gracias", "help": "Ayuda",
+    "restroom": "Baño", "water": "Agua", "exit": "Salida",
+    "food": "Comida", "first aid": "Primeros auxilios",
+    "emergency": "Emergencia", "police": "Policía", "where": "Dónde",
+  },
+  fr: {
+    "hello": "Bonjour", "thank you": "Merci", "help": "Aide",
+    "restroom": "Toilettes", "water": "Eau", "exit": "Sortie",
+    "food": "Nourriture", "first aid": "Premiers secours",
+    "emergency": "Urgence", "police": "Police", "where": "Où",
+  },
+};
+
 export async function stadiumTranslate(input: unknown) {
   const data = TranslateInput.parse(input);
   const lang = data.targetLanguage;
-  const prefix = lang === "es" ? "[Traducción]" :
-    lang === "fr" ? "[Traduction]" :
-    lang === "de" ? "[Übersetzung]" :
-    `[${lang}]`;
-  return { translation: `${prefix} ${data.text}` };
+  const text = data.text.trim();
+
+  const dict = knownTranslations[lang];
+  if (dict) {
+    const lower = text.toLowerCase();
+    for (const [en, translation] of Object.entries(dict)) {
+      if (lower === en.toLowerCase() || lower.startsWith(en.toLowerCase())) {
+        const rest = text.slice(en.length).trim();
+        return { translation: `${translation}${rest ? " " + rest : ""}` };
+      }
+    }
+  }
+
+  const prefixes: Record<string, string> = {
+    es: "🔊 Escucha: ", fr: "🔊 Écoutez: ",
+    de: "🔊 Hören Sie: ", zh: "🔊 听: ",
+    ar: "🔊 استمع: ", hi: "🔊 सुनें: ",
+    ja: "🔊 聞いてください: ", pt: "🔊 Ouça: ",
+  };
+  return { translation: `${prefixes[lang] ?? `[${lang}] `}${text}` };
 }
